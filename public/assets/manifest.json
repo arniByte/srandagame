@@ -1,0 +1,200 @@
+{
+ "piece.vermilion.pawn": {
+  "src": "/assets/pieces/vermilion_pawn.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.27503
+ },
+ "piece.vermilion.knight": {
+  "src": "/assets/pieces/vermilion_knight.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.26092
+ },
+ "piece.vermilion.bishop": {
+  "src": "/assets/pieces/vermilion_bishop.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.28125
+ },
+ "piece.vermilion.rook": {
+  "src": "/assets/pieces/vermilion_rook.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.28125
+ },
+ "piece.vermilion.queen": {
+  "src": "/assets/pieces/vermilion_queen.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.28125
+ },
+ "piece.vermilion.king": {
+  "src": "/assets/pieces/vermilion_king.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.28125
+ },
+ "piece.vermilion.dove": {
+  "src": "/assets/pieces/vermilion_dove.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.19875
+ },
+ "piece.vermilion.dancer": {
+  "src": "/assets/pieces/vermilion_dancer.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.2217
+ },
+ "piece.vermilion.square": {
+  "src": "/assets/pieces/vermilion_square.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.19721
+ },
+ "piece.vermilion.vine": {
+  "src": "/assets/pieces/vermilion_vine.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.25632
+ },
+ "piece.ink.pawn": {
+  "src": "/assets/pieces/ink_pawn.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.2361
+ },
+ "piece.ink.knight": {
+  "src": "/assets/pieces/ink_knight.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.27577
+ },
+ "piece.ink.bishop": {
+  "src": "/assets/pieces/ink_bishop.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.25188
+ },
+ "piece.ink.rook": {
+  "src": "/assets/pieces/ink_rook.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.26992
+ },
+ "piece.ink.queen": {
+  "src": "/assets/pieces/ink_queen.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.28125
+ },
+ "piece.ink.king": {
+  "src": "/assets/pieces/ink_king.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.28125
+ },
+ "piece.ink.gate": {
+  "src": "/assets/pieces/ink_gate.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.20071
+ },
+ "piece.ink.dove": {
+  "src": "/assets/pieces/ink_dove.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.19875
+ },
+ "piece.ink.dancer": {
+  "src": "/assets/pieces/ink_dancer.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.2544
+ },
+ "piece.ink.square": {
+  "src": "/assets/pieces/ink_square.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.265
+ },
+ "piece.ink.vine": {
+  "src": "/assets/pieces/ink_vine.webp",
+  "pivot": [
+   0.5,
+   0.97
+  ],
+  "worldScale": 0.19953
+ },
+ "card.illus.scissors": {
+  "src": "/assets/cards/scissors.webp"
+ },
+ "card.illus.glue": {
+  "src": "/assets/cards/glue.webp"
+ },
+ "card.illus.freshStroke": {
+  "src": "/assets/cards/freshStroke.webp"
+ },
+ "card.illus.stiffen": {
+  "src": "/assets/cards/stiffen.webp"
+ },
+ "card.illus.solvent": {
+  "src": "/assets/cards/solvent.webp"
+ },
+ "card.illus.pirouette": {
+  "src": "/assets/cards/pirouette.webp"
+ },
+ "card.illus.inspiration": {
+  "src": "/assets/cards/inspiration.webp"
+ },
+ "card.illus.palette": {
+  "src": "/assets/cards/palette.webp"
+ },
+ "card.illus.shove": {
+  "src": "/assets/cards/shove.webp"
+ },
+ "card.illus.gust": {
+  "src": "/assets/cards/gust.webp"
+ }
+}

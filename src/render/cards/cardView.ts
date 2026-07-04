@@ -1,7 +1,7 @@
 import { Container, Sprite, Text } from 'pixi.js'
 import type { CardDef } from '../../engine/types'
 import { assets } from '../../assets/manifest'
-import { CARD_TEX, ILLUS_TEX } from '../../assets/placeholders'
+import { CARD_TEX } from '../../assets/placeholders'
 import { PAL, cssColor } from '../../assets/palette'
 
 export const CARD_W = CARD_TEX.w
@@ -42,8 +42,10 @@ export class CardView {
     const illus = new Sprite(assets.texture(`card.illus.${def.id}`))
     illus.anchor.set(0.5)
     illus.position.set(0, -34)
-    // Вписываем в плашку иллюстрации.
-    const fit = Math.min((CARD_W - 30) / ILLUS_TEX.w, 72 / ILLUS_TEX.h)
+    // Вписываем по ФАКТИЧЕСКОМУ размеру текстуры (плейсхолдер или сгенерённый арт).
+    const iw = Math.max(1, illus.texture.width)
+    const ih = Math.max(1, illus.texture.height)
+    const fit = Math.min((CARD_W - 30) / iw, 72 / ih)
     illus.scale.set(fit)
     this.root.addChild(illus)
 
