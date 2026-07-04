@@ -56,6 +56,14 @@ export function newBattle(args: SetupArgs): BattleState {
     }
   }
 
+  // Случайная расстановка: армии тасуются по своим клеткам сидом боя.
+  if (encounter.shuffle) {
+    const spots = enemies.map(e => e.at)
+    rngShuffle(rng, spots)
+    for (let i = 0; i < enemies.length; i++) (enemies[i] as { at: Sq }).at = spots[i] as Sq
+    rngShuffle(rng, spawnSquares)
+  }
+
   const state: BattleState = {
     v: 1,
     rng,
@@ -70,11 +78,11 @@ export function newBattle(args: SetupArgs): BattleState {
     cards: [],
     sides: [
       {
-        paint: args.startingPaint ?? 3, paintMax: 10,
+        paint: args.startingPaint ?? 2, paintMax: 8,
         draw: [], hand: [], discard: [], exhausted: [], handLimit: 5,
       },
       {
-        paint: encounter.enemyPaint ?? 3, paintMax: 10,
+        paint: encounter.enemyPaint ?? 2, paintMax: 8,
         draw: [], hand: [], discard: [], exhausted: [], handLimit: 5,
       },
     ],

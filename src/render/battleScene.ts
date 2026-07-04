@@ -49,6 +49,8 @@ export class BattleScene {
 
   // HUD
   private hud = new Container()
+  private hudPlate = new Graphics()
+  private paintPlate = new Graphics()
   private turnText!: Text
   private objText!: Text
   private paintRow = new Container()
@@ -533,13 +535,34 @@ export class BattleScene {
       this.host.tryAction({ t: 'endTurn' })
     })
 
-    this.hud.addChild(this.turnText, this.objText, this.paintRow, this.endBtn)
+    this.hud.addChild(this.hudPlate, this.paintPlate, this.turnText, this.objText, this.paintRow, this.endBtn)
+  }
+
+  /** Тёмные рисованные плашки под HUD-текстами — читаемость на любом небе. */
+  private redrawPlates(h: number): void {
+    const w1 = Math.max(this.turnText.width, this.objText.width) + 30
+    this.hudPlate.clear()
+    this.hudPlate
+      .roundRect(6, HUD_TOP - 6, w1, 56, 10)
+      .fill({ color: 0x181510, alpha: 0.72 })
+      .roundRect(6, HUD_TOP - 6, w1, 56, 10)
+      .stroke({ width: 1.5, color: 0xf5efe0, alpha: 0.18 })
+
+    const state = this.host.getState()
+    const w2 = state.sides[0].paintMax * 22 + 18
+    this.paintPlate.clear()
+    this.paintPlate
+      .roundRect(2, h - 62, w2, 40, 10)
+      .fill({ color: 0x181510, alpha: 0.72 })
+      .roundRect(2, h - 62, w2, 40, 10)
+      .stroke({ width: 1.5, color: 0xf5efe0, alpha: 0.18 })
   }
 
   private layoutHud(w: number, h: number): void {
-    this.paintRow.position.set(16, h - 44)
+    this.paintRow.position.set(16, h - 42)
     this.endBtn.position.set(w - 172, h - 356)
     if (this.banner) this.banner.position.set(w / 2, h / 2)
+    this.redrawPlates(h)
   }
 
   private refreshHud(): void {
@@ -549,6 +572,7 @@ export class BattleScene {
     this.turnText.style.fill = you ? cssColor(PAL.ochre) : cssColor(PAL.blue)
     this.objText.text = this.objectiveLabel(state)
     this.endBtn.alpha = you && state.phase === 'main' ? 1 : 0.45
+    this.redrawPlates(this.lastH)
 
     // Капли краски.
     this.paintRow.removeChildren().forEach(c => c.destroy())

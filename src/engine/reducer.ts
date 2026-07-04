@@ -11,7 +11,7 @@ import { executeEffects } from './cards'
 import { checkResult } from './objectives'
 
 /** Краска, начисляемая в начале каждого своего хода. */
-export const PAINT_PER_TURN = 2
+export const PAINT_PER_TURN = 1
 /** Сколько вариантов предлагает промоушен-драфт. */
 export const PROMO_CHOICES = 3
 

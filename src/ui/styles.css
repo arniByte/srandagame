@@ -78,6 +78,13 @@ button.btn.ochre { background: var(--ochre); color: var(--ink); }
 button.btn.blue { background: var(--blue); }
 button.btn.ghost { background: transparent; color: var(--paper); box-shadow: none; }
 button.btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+button.btn.glow {
+  animation: glowPulse 1.6s ease-in-out infinite alternate;
+}
+@keyframes glowPulse {
+  from { box-shadow: 4px 5px 0 rgba(0,0,0,0.3), 0 0 6px rgba(46,108,181,0.5); }
+  to   { box-shadow: 4px 5px 0 rgba(0,0,0,0.3), 0 0 22px rgba(242,162,12,0.95); }
+}
 
 .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch; }
 
@@ -121,6 +128,12 @@ button.btn:disabled { opacity: 0.4; cursor: default; transform: none; }
   display: flex; gap: 14px; align-items: center;
   color: var(--paper); font-size: 17px;
   text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+}
+/* Рисованная плашка под текстом HUD — читаемость на ярком небе. */
+.plaque {
+  background: rgba(24, 21, 16, 0.72);
+  padding: 6px 14px;
+  clip-path: polygon(1.5% 12%, 98.5% 2%, 99.5% 86%, 0.5% 96%);
 }
 .battle-hud .gold { color: var(--ochre); }
 

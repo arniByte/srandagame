@@ -21,7 +21,7 @@ export const CARDS: CardDef[] = [
   },
   {
     id: 'freshStroke', name: 'Свежий мазок', desc: 'Призвать пешку на своей половине.',
-    cost: 2, rarity: 'common', illus: 'card.illus.freshStroke',
+    cost: 3, rarity: 'common', illus: 'card.illus.freshStroke',
     target: { kind: 'tile', tile: 'empty', ownHalf: true },
     effects: [{ op: 'summon', pieceType: 'pawn' }],
     aiHint: { weight: 4, cat: 'summon' },
@@ -35,7 +35,7 @@ export const CARDS: CardDef[] = [
   },
   {
     id: 'solvent', name: 'Растворитель', desc: 'Растворить фигуру врага ценностью до 3.',
-    cost: 4, rarity: 'rare', illus: 'card.illus.solvent',
+    cost: 5, rarity: 'rare', illus: 'card.illus.solvent',
     target: { kind: 'piece', side: 'enemy', maxValue: 3 },
     effects: [{ op: 'destroy' }],
     aiHint: { weight: 7, cat: 'removal' },
@@ -49,7 +49,7 @@ export const CARDS: CardDef[] = [
   },
   {
     id: 'inspiration', name: 'Вдохновение', desc: 'Взять 2 карты.',
-    cost: 1, rarity: 'common', illus: 'card.illus.inspiration',
+    cost: 2, rarity: 'common', illus: 'card.illus.inspiration',
     target: { kind: 'none' },
     effects: [{ op: 'draw', n: 2 }],
     aiHint: { weight: 2, cat: 'economy' },

@@ -314,6 +314,8 @@ export interface EncounterDef {
   enemyDeck?: string[]
   /** Стартовая краска врага. */
   enemyPaint?: number
+  /** Перемешивать расстановку обеих армий сидом боя (ворота не двигаются). */
+  shuffle?: boolean
   /** Награда золотом. */
   gold: [min: number, max: number]
   elite?: boolean

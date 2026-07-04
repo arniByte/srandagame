@@ -9,17 +9,22 @@ import type { PeerInfo, RoomTransport } from './transport'
 
 let client: SupabaseClient | null = null
 
+// Фолбэк: anon-ключ Supabase публичен по дизайну (защита — RLS/отсутствие таблиц),
+// поэтому кооп работает даже без env-переменных на хостинге.
+const FALLBACK_URL = 'https://heirpnnazjrcnfljridj.supabase.co'
+const FALLBACK_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlaXJwbm5hempyY25mbGpyaWRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1Nzc2OTMsImV4cCI6MjA5ODE1MzY5M30.5LOw-XvLbg4mxxkEWGi08vr3aWfAYO-2R9z2Pj_yto8'
+
+const supaUrl = (): string => (import.meta.env.VITE_SUPABASE_URL as string | undefined) || FALLBACK_URL
+const supaKey = (): string => (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || FALLBACK_ANON
+
 export function supabaseAvailable(): boolean {
-  return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+  return Boolean(supaUrl() && supaKey())
 }
 
 function getClient(): SupabaseClient {
   if (!client) {
-    client = createClient(
-      import.meta.env.VITE_SUPABASE_URL as string,
-      import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-      { realtime: { params: { eventsPerSecond: 20 } } },
-    )
+    client = createClient(supaUrl(), supaKey(),
+      { realtime: { params: { eventsPerSecond: 20 } } })
   }
   return client
 }

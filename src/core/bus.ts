@@ -15,6 +15,8 @@ export interface GameEvents {
   assetsSwapped: { keys: string[] }
   /** Изменение качества рендера. */
   quality: { tier: QualityTier }
+  /** Смена биома диорамы (тип боя/локации). */
+  biome: { name: BiomeName }
   /** Логический ресайз вьюпорта. */
   resize: { w: number; h: number; dpr: number }
 }
@@ -24,6 +26,7 @@ export type ScreenName =
   | 'reward' | 'lobby' | 'gameover' | 'victory'
 
 export type QualityTier = 'high' | 'medium' | 'low'
+export type BiomeName = 'dusk' | 'night' | 'blood'
 
 type Handler<T> = (payload: T) => void
 

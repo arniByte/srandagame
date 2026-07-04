@@ -51,9 +51,11 @@ function Menu({ game }: { game: GameController }) {
           {game.hasSave && (
             <button class="btn" onClick={() => game.continueRun()}>Продолжить</button>
           )}
-          <button class="btn blue" disabled={!game.coopAvailable()}
+          <button class="btn blue glow" disabled={!game.coopAvailable()}
             title={game.coopAvailable() ? '' : 'Не настроен Supabase (.env)'}
-            onClick={() => game.openLobby()}>Кооп с другом</button>
+            onClick={() => game.openLobby()}>Кооп по сети</button>
+          <button class="btn green" style="background:#2c8c57"
+            onClick={() => game.startHotseat()}>Вдвоём за этим экраном</button>
         </div>
         <p class="small">
           Веди армию-аппликацию к замку. Ходи фигурами, играй карты за краску,
@@ -142,11 +144,14 @@ function MapScreen({ game }: { game: GameController }) {
 // ---------------------------------------------------------------------------
 
 function BattleHud({ game }: { game: GameController }) {
-  const coop = game.mode !== 'solo'
+  const coop = game.mode === 'coop-host' || game.mode === 'coop-guest'
   const myTurn = game.inputEnabled()
   return (
     <div class="screen transparent">
-      <div class="battle-hud">
+      <div class="battle-hud plaque">
+        {game.mode === 'hotseat' && game.battle?.active === 0 && (
+          <span style="color:#f2a20c">Ходит Игрок {game.hotseatPlayer()}</span>
+        )}
         {coop && (
           <span style={myTurn ? 'color:#f2a20c' : 'opacity:.75'}>
             {game.battle?.active === 0
@@ -285,9 +290,15 @@ function EventScreen({ game }: { game: GameController }) {
   return (
     <div class="screen">
       <SpectatorBadge game={game} />
-      <div class="paper" style="max-width:520px">
+      <div class="paper" style="max-width:560px;text-align:center">
+        <img
+          src={`/assets/events/${ev.id}.webp`}
+          alt=""
+          style="max-width:78%;max-height:200px;border:3px solid #1d1d1b;box-shadow:4px 5px 0 rgba(0,0,0,.3);transform:rotate(-1.2deg)"
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
         <h2>{ev.title}</h2>
-        <p>{ev.text}</p>
+        <p style="text-align:left">{ev.text}</p>
         <div style="display:flex;flex-direction:column;gap:6px">
           {ev.choices.map((c, i) => {
             if (c.condition && !c.condition(run)) return null

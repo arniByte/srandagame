@@ -11,6 +11,7 @@ declare global {
         movedThisTurn: boolean
         promoting: { piece: number; options: string[] } | null
         pieces: { id: number; owner: number; pos: number }[]
+        sides: { hand: number[]; paint: number }[]
       } | null
       run: { gold: number; roster: unknown[] } | null
       newRun(seed?: string): void
