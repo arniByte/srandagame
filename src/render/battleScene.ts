@@ -108,7 +108,7 @@ export class BattleScene {
         view.setPos(x, y, this.proj.cell)
       }
     }
-    this.handView.setArea({ x: w - handW + 6, y: h - 296, w: handW - 16, h: 288 })
+    this.handView.setArea({ x: w - handW + 6, y: h - 336, w: handW - 16, h: 300 })
     this.layoutHud(w, h)
     if (this.promoteOverlay) this.rebuildPromoteOverlay()
   }
