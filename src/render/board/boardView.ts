@@ -7,7 +7,7 @@ import { ticker, TICK } from '../../core/ticker'
 import { tornPoly } from '../../assets/paperEdge'
 import { SM_HZ, visualRng } from '../anim/stopmotion'
 import { killTweensOf, tween, wait } from '../anim/tween'
-import { PERSP, cellAt, scaleAt, sqToXY, xyToSq, type Projection } from './projection'
+import { cellAt, scaleAt, sqToXY, xyToSq, type Projection } from './projection'
 
 /** Дизайн-размер тайла в текстуре (см. placeholders.tileTexture). */
 const TILE_DESIGN = 60
@@ -104,7 +104,7 @@ export class BoardView {
             sp.rotation = base + Math.sin(step * 0.7 + phase) * 0.006
           }
           const y = sqY(sq)
-          const depth = Math.min(1, (1 - scaleAt(p, y)) / PERSP)
+          const depth = Math.min(1, (1 - scaleAt(p, y)) / Math.max(0.01, p.persp))
           const shift = this.parX * 2.4 * depth
           const dx = sp.x - this.pointerLX
           const dy = sp.y - this.pointerLY
@@ -147,6 +147,27 @@ export class BoardView {
     return this.proj
   }
 
+  /**
+   * Лёгкая перепроекция БЕЗ пересборки: существующие тайлы переезжают
+   * на новые места (вращение доски RMB-драгом — каждый кадр).
+   */
+  reproject(proj: Projection): void {
+    this.proj = proj
+    for (const [sq, sp] of this.tiles) {
+      const { x, y } = sqToXY(proj, sq)
+      sp.position.set(x, y)
+      const rs = scaleAt(proj, sqY(sq))
+      sp.scale.set((proj.cell * rs * 1.03) / TILE_DESIGN, (proj.cellH * rs * 1.07) / TILE_DESIGN)
+    }
+    const pad = proj.cell * 2
+    this.container.hitArea = new Rectangle(
+      proj.cx - (proj.bw * proj.cell) / 2 - pad, proj.rowTop[0] ?? 0,
+      proj.bw * proj.cell + pad * 2,
+      (proj.rowBottom[proj.bh - 1] ?? 0) - (proj.rowTop[0] ?? 0),
+    )
+    this.drawHover()
+  }
+
   /** Сглаженный горизонтальный параллакс сцены (из battleScene). */
   setParallax(parX: number): void {
     this.parX = parX
@@ -156,7 +177,7 @@ export class BoardView {
   rowShift(y: number): number {
     const p = this.proj
     if (!p) return 0
-    const depth = Math.min(1, (1 - scaleAt(p, y)) / PERSP)
+    const depth = Math.min(1, (1 - scaleAt(p, y)) / Math.max(0.01, p.persp))
     return this.parX * 2.4 * depth
   }
 

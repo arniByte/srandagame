@@ -18,10 +18,11 @@ export class CardView {
   readonly defId: string
   cost: number
 
-  /** Домашняя раскладка в веере (устанавливает HandView). */
+  /** Домашняя раскладка в сетке руки (устанавливает HandView). */
   homeX = 0
   homeY = 0
   homeRot = 0
+  homeScale = 1
 
   hovered = false
   dragging = false

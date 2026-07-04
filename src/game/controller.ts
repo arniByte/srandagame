@@ -454,6 +454,18 @@ export class GameController implements BattleSceneHost {
     this.completeAndBackToMap(`event:${this.event.id}:${i}`)
   }
 
+  /** Принудительный выход: уйти с события, ничего не выбрав. */
+  skipEvent(): void {
+    if (!this.run || this.isSpectatorMeta()) return
+    this.completeAndBackToMap('event:skip')
+  }
+
+  /** Принудительный выход: уйти с привала без обучения/улучшения. */
+  skipRest(): void {
+    if (!this.run || this.isSpectatorMeta()) return
+    this.completeAndBackToMap('rest:skip')
+  }
+
   restTrain(rid: string, traitId: string): void {
     if (!this.run || this.isSpectatorMeta()) return
     this.run = trainPiece(this.run, rid, traitId)

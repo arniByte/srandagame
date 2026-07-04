@@ -201,7 +201,7 @@ export class DragController {
     if (offended) audio.sfx('error', 0.5)
     killTweensOf(card.root)
     tween(card.root, { x: card.homeX, y: card.homeY }, { dur: 0.34, ease: elasticOut })
-    tween(card.root.scale, { x: 1, y: 1 }, { dur: 0.2, owner: card.root })
+    tween(card.root.scale, { x: card.homeScale, y: card.homeScale }, { dur: 0.2, owner: card.root })
     // Покачивание: перелёт по повороту с упругим доводом.
     card.root.rotation = card.homeRot + (offended ? 0.35 : 0.12)
     tween(card.root, { rotation: card.homeRot }, {

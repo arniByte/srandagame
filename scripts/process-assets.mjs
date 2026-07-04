@@ -66,11 +66,15 @@ for (const item of spec) {
       sh = Math.min(H - sy, maxY + pad - sy + 1)
     }
 
-    // Целевой размер: piece — h512; card/frame — w320; wide — w1600; strip — w1400 (с кропом).
+    // Целевой размер: piece — h512; card/frame — w320; sky — w2048 (чёткость);
+    // wide — w1600; strip — w1400 (с кропом).
     let tw, th
     if (kind === 'piece') {
       th = 512
       tw = Math.round(sw * (th / sh))
+    } else if (kind === 'sky') {
+      tw = 2048
+      th = Math.round(sh * (tw / sw))
     } else if (kind === 'wide') {
       tw = 1600
       th = Math.round(sh * (tw / sw))

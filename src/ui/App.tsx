@@ -28,6 +28,16 @@ export function App({ game }: { game: GameController }) {
   }
 }
 
+/**
+ * Принудительный выход/возврат: рисованный ✕ в правом верхнем углу экрана.
+ * Есть на КАЖДОЙ вкладке — из любого места можно уйти одним кликом.
+ */
+function CloseX({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button class="close-x" title={title} onClick={onClick}>✕</button>
+  )
+}
+
 /** Плашка гостя на мета-экранах: решает хост. */
 function SpectatorBadge({ game }: { game: GameController }) {
   if (!game.isSpectatorMeta()) return null
@@ -41,11 +51,17 @@ function SpectatorBadge({ game }: { game: GameController }) {
 function Menu({ game }: { game: GameController }) {
   return (
     <div class="screen">
-      <div class="paper" style="text-align:center">
+      <div class="paper menu-paper" style="text-align:center">
         <h1 class="logo">
           <span class="c1">CHECK</span><span class="c2">MA</span><span class="c3">TISSE</span>
         </h1>
         <p class="tagline">рогалик-шахматы из бумаги, ножниц и масляной краски</p>
+        <img
+          class="menu-hero"
+          src="/assets/ui/menu-hero.webp"
+          alt=""
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
         <div class="row">
           <button class="btn red" onClick={() => game.newRun()}>Новый забег</button>
           {game.hasSave && (
@@ -94,16 +110,21 @@ function MapScreen({ game }: { game: GameController }) {
   return (
     <div class="screen">
       <SpectatorBadge game={game} />
+      <CloseX title="В меню" onClick={() => game.toMenu()} />
       <div class="map-wrap">
         <div style="display:flex;justify-content:space-between;padding:4px 12px;align-items:baseline">
           <h2>Путь к замку · акт {run.act}</h2>
           <div>
             <span class="gold-badge">◉ {run.gold}</span>
             <span style="opacity:.6;margin-left:12px">колода: {run.deck.length} · армия: {run.roster.length}</span>
-            <button class="btn ghost" style="color:#1d1d1b;font-size:14px" onClick={() => game.toMenu()}>меню</button>
           </div>
         </div>
         <svg class="map-svg" viewBox={`0 0 ${W} ${H}`}>
+          {/* Рисованные ориентиры свитка: замок-цель наверху, солнце Малевича. */}
+          <circle cx={W - 96} cy={64} r={40} fill="#f2a20c" opacity="0.85"
+            transform={`rotate(3 ${W - 96} 64)`} />
+          <image href="/assets/bg/castle.webp" x={W / 2 - 130} y={-14} width="260"
+            opacity="0.5" preserveAspectRatio="xMidYMin meet" />
           {run.map.map(n => n.edges.map(eid => {
             const to = run.map.find(m => m.id === eid)
             if (!to) return null
@@ -111,7 +132,8 @@ function MapScreen({ game }: { game: GameController }) {
               <line
                 key={n.id + eid}
                 x1={x(n.col)} y1={y(n.row)} x2={x(to.col)} y2={y(to.row)}
-                stroke="#1d1d1b" stroke-width="2" stroke-dasharray="6 5" opacity="0.4"
+                stroke="#1d1d1b" stroke-width="2.5" stroke-dasharray="7 6"
+                stroke-linecap="round" opacity="0.45"
               />
             )
           }))}
@@ -123,15 +145,28 @@ function MapScreen({ game }: { game: GameController }) {
               : n.kind === 'rest' ? '#2c8c57'
               : '#f5efe0'
             const glyphFill = fill === '#f5efe0' ? '#1d1d1b' : '#f5efe0'
+            const r = n.kind === 'boss' ? 26 : 16
             return (
               <g key={n.id} class={cls} onClick={() => avail.has(n.id) && game.selectNode(n.id)}>
                 <title>{NODE_NAME[n.kind]}</title>
-                <circle cx={x(n.col)} cy={y(n.row)} r={n.kind === 'boss' ? 26 : 16}
-                  fill={fill} stroke="#1d1d1b" stroke-width="2"
+                {/* Бумажная тень-подложка. */}
+                <circle cx={x(n.col) + 2.5} cy={y(n.row) + 3.5} r={r} fill="#1d1d1b" opacity="0.25" />
+                {avail.has(n.id) && (
+                  <circle class="halo" cx={x(n.col)} cy={y(n.row)} r={r + 9}
+                    fill="none" stroke="#d93829" stroke-width="2.5" stroke-dasharray="5 7"
+                    stroke-linecap="round" />
+                )}
+                <circle cx={x(n.col)} cy={y(n.row)} r={r}
+                  fill={fill} stroke="#1d1d1b" stroke-width="2.5"
                   transform={`rotate(${(n.col * 7 + n.row * 13) % 9 - 4} ${x(n.col)} ${y(n.row)})`} />
                 <text x={x(n.col)} y={y(n.row) + 6} text-anchor="middle"
                   font-size={n.kind === 'boss' ? 24 : 15} fill={glyphFill}
                   style="pointer-events:none">{NODE_GLYPH[n.kind]}</text>
+                {n.visited && (
+                  <text x={x(n.col) + r - 4} y={y(n.row) - r + 8} text-anchor="middle"
+                    font-size="18" fill="#d93829" font-weight="bold"
+                    style="pointer-events:none">✓</text>
+                )}
               </g>
             )
           })}
@@ -176,6 +211,7 @@ function Lobby({ game }: { game: GameController }) {
   const [code, setCode] = useState('')
   return (
     <div class="screen">
+      <CloseX title="В меню" onClick={() => game.toMenu()} />
       <div class="paper" style="text-align:center;max-width:480px">
         <h2>Кооп: общая армия</h2>
         <p class="small">
@@ -226,6 +262,7 @@ function Shop({ game }: { game: GameController }) {
   return (
     <div class="screen">
       <SpectatorBadge game={game} />
+      <CloseX title="Уйти из лавки" onClick={() => game.leaveShop()} />
       <div class="paper" style="text-align:center">
         <h2>Лавка старьёвщика</h2>
         <p class="small">«Краденое? Что вы. Найденное». <span class="gold-badge">◉ {run.gold}</span></p>
@@ -290,6 +327,7 @@ function EventScreen({ game }: { game: GameController }) {
   return (
     <div class="screen">
       <SpectatorBadge game={game} />
+      <CloseX title="Уйти молча" onClick={() => game.skipEvent()} />
       <div class="paper" style="max-width:560px;text-align:center">
         <img
           src={`/assets/events/${ev.id}.webp`}
@@ -321,6 +359,7 @@ function Rest({ game }: { game: GameController }) {
   return (
     <div class="screen">
       <SpectatorBadge game={game} />
+      <CloseX title="Уйти, не отдыхая" onClick={() => game.skipRest()} />
       <div class="paper" style="text-align:center;max-width:560px">
         <h2>Привал у костра из рам</h2>
         <p class="small">Выбери одно: обучить фигуру или улучшить карту.</p>
@@ -370,6 +409,7 @@ function Reward({ game }: { game: GameController }) {
   return (
     <div class="screen">
       <SpectatorBadge game={game} />
+      <CloseX title="Пропустить награду" onClick={() => game.pickRewardCard(null)} />
       <div class="paper" style="text-align:center">
         <h2>Трофеи боя</h2>
         <p class="gold-badge">+◉ {r.gold}</p>
@@ -398,6 +438,7 @@ function Reward({ game }: { game: GameController }) {
 function End({ game, victory }: { game: GameController; victory: boolean }) {
   return (
     <div class="screen">
+      <CloseX title="В меню" onClick={() => game.toMenu()} />
       <div class="paper" style="text-align:center">
         <h1 class="logo" style="font-size:44px">
           {victory
