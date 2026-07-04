@@ -83,7 +83,7 @@ export class HandView {
   relayout(instant: boolean): void {
     const n = this.order.length
     const cx = this.area.x + this.area.w / 2
-    const cy = this.area.y + this.area.h - CARD_H * 0.32
+    const cy = this.area.y + this.area.h - CARD_H * 0.62 // целиком в области, с запасом на дугу
     const spread = Math.min(this.area.w - CARD_W * 0.7, Math.max(n - 1, 1) * 52)
     let z = 0
     for (let i = 0; i < n; i++) {
