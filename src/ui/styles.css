@@ -88,6 +88,32 @@ button.btn.glow {
 
 .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch; }
 
+/* Принудительный выход: рисованный ✕ в правом верхнем углу любого экрана. */
+.close-x {
+  position: absolute; top: 16px; right: 20px; z-index: 6;
+  width: 46px; height: 46px;
+  font-family: 'Amatic SC', 'Neucha', serif;
+  font-size: 26px; font-weight: 700; line-height: 1;
+  border: none; cursor: pointer;
+  background: var(--red); color: var(--paper);
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.35);
+  clip-path: polygon(6% 12%, 90% 3%, 97% 88%, 10% 96%);
+  transition: transform 0.08s ease-out;
+}
+.close-x:hover { transform: rotate(6deg) scale(1.1); }
+.close-x:active { transform: scale(0.94); }
+
+/* Рисованное меню: парад фигур из генератора. */
+.menu-paper { max-width: min(760px, 94vw); }
+.menu-hero {
+  display: block;
+  width: min(560px, 68vw);
+  margin: 0 auto 16px;
+  border: 3px solid var(--ink);
+  box-shadow: 5px 6px 0 rgba(0, 0, 0, 0.3);
+  transform: rotate(-0.8deg);
+}
+
 /* Карта забега */
 .map-wrap {
   width: min(860px, 94vw); height: 82vh;
@@ -101,9 +127,11 @@ button.btn.glow {
 .map-svg { width: 100%; display: block; }
 .map-node { cursor: default; }
 .map-node.available { cursor: pointer; }
-.map-node.available circle { stroke: var(--red); stroke-width: 3; animation: pulse 1.2s infinite alternate; }
-.map-node.visited { opacity: 0.35; }
-@keyframes pulse { from { r: 15; } to { r: 17; } }
+.map-node.available:hover circle:not(.halo) { stroke-width: 4; }
+/* Крутящееся пунктирное кольцо доступного узла — «сюда можно». */
+.map-node .halo { animation: dashSpin 1.6s linear infinite; }
+@keyframes dashSpin { to { stroke-dashoffset: -24; } }
+.map-node.visited { opacity: 0.4; }
 
 /* Мини-карточки (награды, лавка) */
 .mini-card {

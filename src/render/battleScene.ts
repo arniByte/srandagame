@@ -68,6 +68,15 @@ export class BattleScene {
   private parX = 0
   private parY = 0
 
+  // Осмотр доски: RMB-драг вращает «камеру» (yaw/pitch), отпустил — пружинит назад.
+  private boardRect = { x: 14, y: 58, w: 800, h: 600 }
+  private orbYaw = 0
+  private orbPitch = 0
+  private orbActive = false
+  private orbLX = 0
+  private orbLY = 0
+  private orbMoved = 0
+
   constructor(host: BattleSceneHost) {
     this.host = host
     this.handView = new HandView(host)
@@ -101,12 +110,66 @@ export class BattleScene {
     const onMove = (e: PointerEvent): void => {
       this.mouseNX = e.clientX / Math.max(1, window.innerWidth) - 0.5
       this.mouseNY = e.clientY / Math.max(1, window.innerHeight) - 0.5
+      if (this.orbActive) {
+        const dx = e.clientX - this.orbLX
+        const dy = e.clientY - this.orbLY
+        this.orbLX = e.clientX
+        this.orbLY = e.clientY
+        this.orbMoved += Math.abs(dx) + Math.abs(dy)
+        this.orbYaw = Math.max(-1.2, Math.min(1.2, this.orbYaw + dx * 0.005))
+        this.orbPitch = Math.max(-1, Math.min(1, this.orbPitch - dy * 0.006))
+        this.applyOrbit()
+      }
     }
     window.addEventListener('pointermove', onMove)
     this.disposers.push(() => window.removeEventListener('pointermove', onMove))
+
+    // Вращение доски правой кнопкой: зажал над доской — осматриваешь стол.
+    const onDown = (e: PointerEvent): void => {
+      if (e.button !== 2) return
+      this.orbActive = true
+      this.orbLX = e.clientX
+      this.orbLY = e.clientY
+      this.orbMoved = 0
+      const canvas = this.stage?.app.canvas as HTMLCanvasElement | undefined
+      if (canvas) canvas.style.cursor = 'grabbing'
+    }
+    const onUp = (e: PointerEvent): void => {
+      if (e.button !== 2 || !this.orbActive) return
+      this.orbActive = false
+      const canvas = this.stage?.app.canvas as HTMLCanvasElement | undefined
+      if (canvas) canvas.style.cursor = 'default'
+    }
+    const onCtx = (e: MouseEvent): void => {
+      if (this.orbMoved > 6) e.preventDefault()
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('contextmenu', onCtx)
+    this.disposers.push(() => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('contextmenu', onCtx)
+    })
+
     let breatheT = 0
     this.disposers.push(ticker.add((dt) => {
       breatheT += dt
+      // Пружинный возврат камеры после осмотра (и мгновенный — когда пошли
+      // анимации ходов: перепроекция не должна драться с твинами фигур).
+      if (!this.orbActive && (Math.abs(this.orbYaw) > 0.001 || Math.abs(this.orbPitch) > 0.001)) {
+        if (!this.host.inputEnabled()) {
+          this.orbYaw = 0
+          this.orbPitch = 0
+        } else {
+          const k = Math.min(1, dt * 4)
+          this.orbYaw -= this.orbYaw * k
+          this.orbPitch -= this.orbPitch * k
+          if (Math.abs(this.orbYaw) < 0.001) this.orbYaw = 0
+          if (Math.abs(this.orbPitch) < 0.001) this.orbPitch = 0
+        }
+        this.applyOrbit()
+      }
       // Демпфированное следование за мышью.
       this.parX += ((this.mouseNX * -14) - this.parX) * Math.min(1, dt * 3)
       this.parY += ((this.mouseNY * -9) - this.parY) * Math.min(1, dt * 3)
@@ -149,10 +212,11 @@ export class BattleScene {
   layout(w: number, h: number): void {
     this.lastW = w
     this.lastH = h
-    const handW = Math.min(360, Math.max(240, w * 0.28))
-    const boardRect = { x: 14, y: 58, w: w - handW - 28, h: h - 84 }
+    const handW = Math.min(370, Math.max(250, w * 0.29))
+    this.boardRect = { x: 14, y: 58, w: w - handW - 28, h: h - 84 }
     const state = this.host.getState()
-    this.proj = computeProjection(state.board.w, state.board.h, boardRect)
+    this.proj = computeProjection(state.board.w, state.board.h, this.boardRect,
+      { yaw: this.orbYaw, pitch: this.orbPitch })
     this.boardView.setProjection(this.proj, state)
     for (const view of this.pieceViews.values()) {
       const p = this.statePiece(view.id)
@@ -161,9 +225,35 @@ export class BattleScene {
         view.setPos(x, y, cellAt(this.proj, sqY(p.pos)))
       }
     }
-    this.handView.setArea({ x: w - handW + 6, y: h - 336, w: handW - 16, h: 300 })
+    // Рука — сетка 2 колонки справа: карты не перекрываются, брать удобно.
+    this.handView.setArea({ x: w - handW + 6, y: 86, w: handW - 16, h: h - 86 - 96 })
     this.layoutHud(w, h)
     if (this.promoteOverlay) this.rebuildPromoteOverlay()
+  }
+
+  /**
+   * Перепроекция «камеры» при вращении доски: тайлы и фигуры переезжают
+   * на новые места без пересборки, подсветки перерисовываются.
+   */
+  private applyOrbit(): void {
+    const state = this.host.getState()
+    this.proj = computeProjection(state.board.w, state.board.h, this.boardRect,
+      { yaw: this.orbYaw, pitch: this.orbPitch })
+    this.boardView.reproject(this.proj)
+    for (const view of this.pieceViews.values()) {
+      const p = this.statePiece(view.id)
+      if (!p) continue
+      const { x, y } = this.footXY(p.pos)
+      view.setPos(x, y, cellAt(this.proj, sqY(p.pos)))
+    }
+    if (this.selected !== -1) {
+      const sp = this.statePiece(this.selected)
+      if (sp) this.boardView.setSelected(sp.pos)
+      this.boardView.showMoveHints(this.selectedMoves)
+    }
+    if (state.curator && state.curator.nextAt - state.turn === 1) {
+      this.boardView.telegraphRow(state.curator.row)
+    }
   }
 
   /** Жёсткая пересинхронизация вида по состоянию (без анимаций). */
@@ -560,7 +650,8 @@ export class BattleScene {
 
   private layoutHud(w: number, h: number): void {
     this.paintRow.position.set(16, h - 42)
-    this.endBtn.position.set(w - 172, h - 356)
+    // Кнопка — в правом нижнем углу, ПОД сеткой руки (карты её не накрывают).
+    this.endBtn.position.set(w - 166, h - 60)
     if (this.banner) this.banner.position.set(w / 2, h / 2)
     this.redrawPlates(h)
   }

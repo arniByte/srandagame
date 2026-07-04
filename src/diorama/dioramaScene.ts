@@ -131,14 +131,14 @@ export class DioramaScene implements DioramaHandle {
     const sky = this.skyMesh
     if (sky) {
       const url = this.biome === 'dusk' ? '/assets/bg/sky.webp' : `/assets/bg/sky-${this.biome}.webp`
-      tryArt(url, t => swapMap(sky, t, { mute: this.biome === 'night' ? 0.9 : 0.82 }))
+      tryArt(url, t => swapMap(sky, t, { mute: this.biome === 'night' ? 0.92 : 0.97 }))
     }
     if (this.baseDimMat) {
-      this.baseDimMat.opacity = this.biome === 'night' ? 0.44 : this.biome === 'blood' ? 0.3 : 0.34
+      this.baseDimMat.opacity = this.biome === 'night' ? 0.3 : this.biome === 'blood' ? 0.18 : 0.16
     }
     for (const c of this.clouds) {
       const m = c.mesh.material as THREE.MeshBasicMaterial
-      m.opacity = this.biome === 'night' ? 0.35 : 0.7
+      m.opacity = this.biome === 'night' ? 0.45 : 0.8
     }
   }
 
@@ -147,6 +147,10 @@ export class DioramaScene implements DioramaHandle {
   private skyMesh: THREE.Mesh | null = null
   private baseDimMat: THREE.MeshBasicMaterial | null = null
   private clouds: { mesh: THREE.Mesh; speed: number }[] = []
+  private specks: {
+    mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial
+    baseX: number; rise: number; sway: number; phase: number
+  }[] = []
   private skyT = 0
   private dove: THREE.Mesh | null = null
   private doveT = 0
@@ -187,14 +191,20 @@ export class DioramaScene implements DioramaHandle {
       m.dispose()
     }
     this.layers.length = 0
+    for (const s of this.specks) {
+      this.scene.remove(s.mesh)
+      s.mesh.geometry.dispose()
+      s.mat.dispose()
+    }
+    this.specks.length = 0
 
     // Координаты: центр экрана (0,0), x вправо, y вверх.
-    const sky = this.addLayer(paintSky(w, h), w + 24, h + 24, 0, 0, -900, 0, 0)
+    const sky = this.addLayer(paintSky(w, h), w + 28, h + 28, 0, 0, -900, 0.8, 0)
     this.skyMesh = sky
     const sun = Math.min(w, h) * 0.34
     const sunMesh = this.addLayer(paintSun(sun), sun, sun, -w * 0.31, h * 0.24, -850, 1.5, 1)
     // Солнце уже нарисовано в сгенерённом небе — кодовое прячем.
-    tryArt('/assets/bg/sky.webp', t => { swapMap(sky, t, { mute: 0.82 }); sunMesh.visible = false })
+    tryArt('/assets/bg/sky.webp', t => { swapMap(sky, t, { mute: 0.97 }); sunMesh.visible = false })
 
     // Дрейфующие бумажные облака (если арт сгенерирован).
     this.clouds = []
@@ -208,29 +218,53 @@ export class DioramaScene implements DioramaHandle {
       mesh.position.set(-w / 2 + i * w * 0.6, h * (0.3 - i * 0.13), -860)
       this.scene.add(mesh)
       this.layers.push({ mesh, depth: 1 + i * 0.7, baseX: mesh.position.x, baseY: mesh.position.y })
-      const entry = { mesh, speed: (6 + i * 4) }
+      const entry = { mesh, speed: (9 + i * 5) }
       this.clouds.push(entry)
       tryArt(`/assets/bg/${urlName}.webp`, t => {
         const m = mesh.material as THREE.MeshBasicMaterial
         m.map = t
-        m.opacity = 0.7
+        m.opacity = 0.8
         m.needsUpdate = true
       })
     }
     const hillsFar = this.addLayer(paintHills(w * 1.18, h * 0.36, 0x2a2013, 41, 0.35), w * 1.18, h * 0.36, 0, -h * 0.27, -800, 2.5, 2)
-    tryArt('/assets/bg/hills-far.webp', t => swapMap(hillsFar, t, { mute: 0.68 }))
+    tryArt('/assets/bg/hills-far.webp', t => swapMap(hillsFar, t, { mute: 0.82 }))
     const cw = Math.min(w * 0.42, h * 0.62)
     const castleMesh = this.addLayer(paintCastle(cw, cw * 0.8), cw, cw * 0.8, w * 0.26, -h * 0.06, -750, 3.2, 3)
     this.castle = castleMesh
     tryArt('/assets/bg/castle.webp', t =>
-      swapMap(castleMesh, t, { keepAspectW: cw, anchorBottomY: -h * 0.30, mute: 0.9 }))
+      swapMap(castleMesh, t, { keepAspectW: cw, anchorBottomY: -h * 0.30, mute: 0.98 }))
     const hillsNear = this.addLayer(paintHills(w * 1.3, h * 0.32, 0x191510, 88, 0.3), w * 1.3, h * 0.32, 0, -h * 0.38, -700, 4.5, 4)
-    tryArt('/assets/bg/hills-near.webp', t => swapMap(hillsNear, t, { mute: 0.55 }))
+    tryArt('/assets/bg/hills-near.webp', t => swapMap(hillsNear, t, { mute: 0.72 }))
     this.addLayer(paintFrontEdge(w * 1.15, h * 0.24), w * 1.15, h * 0.24, 0, -h * 0.45, -650, 6, 5)
 
-    // Постоянное лёгкое затемнение фона: доска и фигуры должны солировать.
+    // Плавающие «брызги краски» — цветной воздух между холмами и лугом.
+    this.specks = []
+    const speckColors = [0xd93829, 0xf2a20c, 0xf5efe0, 0x2e6cb5, 0x2c8c57]
+    for (let i = 0; i < 18; i++) {
+      const sz = 2.5 + (i % 4) * 1.5
+      const mat = new THREE.MeshBasicMaterial({
+        color: speckColors[i % speckColors.length], transparent: true, opacity: 0.4,
+        depthTest: false, depthWrite: false,
+      })
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(sz, sz), mat)
+      mesh.renderOrder = 6
+      mesh.rotation.z = Math.random() * Math.PI
+      mesh.position.set((Math.random() - 0.5) * w, (Math.random() - 0.7) * h * 0.5, -640)
+      this.scene.add(mesh)
+      this.specks.push({
+        mesh, mat,
+        baseX: mesh.position.x,
+        rise: 5 + Math.random() * 9,
+        sway: 4 + Math.random() * 10,
+        phase: Math.random() * 6.28,
+      })
+    }
+
+    // Постоянное лёгкое затемнение фона: доска и фигуры должны солировать,
+    // но сам задник теперь заметно ярче (просьба «фон почётче и поярче»).
     const baseDimMat = new THREE.MeshBasicMaterial({
-      color: 0x14120f, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false,
+      color: 0x14120f, transparent: true, opacity: 0.16, depthTest: false, depthWrite: false,
     })
     this.baseDimMat = baseDimMat
     const baseDim = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.5, h * 1.5), baseDimMat)
@@ -264,11 +298,13 @@ export class DioramaScene implements DioramaHandle {
     this.viewW = w
     this.viewH = h
     if (this.dove) return
-    tryArt('/assets/pieces/vermilion_dove.webp', tex => {
-      const size = 46
+    // Красивый матиссовский голубь (bg/dove.webp), фолбэк — старый силуэт.
+    const attach = (tex: THREE.Texture): void => {
+      if (this.dove) return
+      const size = 58
       const img = tex.image as { width: number; height: number }
       const mat = new THREE.MeshBasicMaterial({
-        map: tex, transparent: true, depthTest: false, depthWrite: false, opacity: 0.92,
+        map: tex, transparent: true, depthTest: false, depthWrite: false, opacity: 0.96,
       })
       const mesh = new THREE.Mesh(
         new THREE.PlaneGeometry(size, size * (img.height / img.width)), mat)
@@ -277,10 +313,14 @@ export class DioramaScene implements DioramaHandle {
       mesh.visible = false
       this.scene.add(mesh)
       this.dove = mesh
-    })
+    }
+    tryArt('/assets/bg/dove.webp', attach)
+    setTimeout(() => {
+      if (!this.dove) tryArt('/assets/pieces/vermilion_dove.webp', attach)
+    }, 2500)
   }
 
-  /** Полёт голубя: степпед-взмахи (стоп-моушен), редкие пролёты. */
+  /** Полёт голубя: степпед-взмахи (стоп-моушен) с лёгким креном, редкие пролёты. */
   private updateDove(dt: number): void {
     const dove = this.dove
     if (!dove) return
@@ -296,15 +336,17 @@ export class DioramaScene implements DioramaHandle {
       }
       return
     }
-    dove.position.x += this.doveDir * dt * this.viewW * 0.055
-    // Взмахи 6 шагов/с: жёсткое переключение «крылья вверх/вниз».
-    const flap = Math.floor(this.doveT * 6) % 2
-    dove.scale.y = flap === 0 ? 1 : 0.82
-    dove.position.y += Math.sin(this.doveT * 1.7) * dt * 6
+    dove.position.x += this.doveDir * dt * this.viewW * 0.05
+    // Взмахи 7 шагов/с, три фазы крыльев — «перекладка» из бумаги.
+    const flap = Math.floor(this.doveT * 7) % 3
+    dove.scale.y = flap === 0 ? 1 : flap === 1 ? 0.8 : 0.9
+    // Лёгкий крен по синусоиде волны полёта.
+    dove.rotation.z = this.doveDir * (0.05 + Math.cos(this.doveT * 1.7) * 0.09)
+    dove.position.y += Math.sin(this.doveT * 1.7) * dt * 9
     if (Math.abs(dove.position.x) > this.viewW / 2 + 80) {
       dove.visible = false
       this.doveT = 0
-      this.doveNext = 12 + Math.random() * 16
+      this.doveNext = 10 + Math.random() * 14
     }
   }
 
@@ -314,7 +356,7 @@ export class DioramaScene implements DioramaHandle {
 
     // Небо медленно «дышит», облака дрейфуют с заворотом.
     if (this.skyMesh) {
-      const p = 1 + Math.sin(this.skyT * 0.14) * 0.012
+      const p = 1 + Math.sin(this.skyT * 0.16) * 0.018
       this.skyMesh.scale.set(p, p, 1)
     }
     for (const c of this.clouds) {
@@ -325,6 +367,19 @@ export class DioramaScene implements DioramaHandle {
         layer.baseX = -this.viewW / 2 - 300
       }
       c.mesh.position.y += Math.sin(this.skyT * 0.4 + c.speed) * dt * 2
+    }
+
+    // Брызги краски: медленно всплывают, покачиваясь и мерцая.
+    for (const s of this.specks) {
+      s.mesh.position.y += s.rise * dt
+      s.mesh.position.x = s.baseX +
+        Math.sin(this.skyT * 0.5 + s.phase) * s.sway - this.smooth.x * 5
+      s.mesh.rotation.z += dt * 0.4
+      s.mat.opacity = 0.22 + 0.22 * (1 + Math.sin(this.skyT * 0.9 + s.phase * 2)) / 2
+      if (s.mesh.position.y > this.viewH * 0.55) {
+        s.mesh.position.y = -this.viewH * 0.55
+        s.baseX = (Math.random() - 0.5) * this.viewW
+      }
     }
 
     // Параллакс: плавное следование за мышью.
@@ -352,6 +407,10 @@ export class DioramaScene implements DioramaHandle {
       const m = l.mesh.material as THREE.MeshBasicMaterial
       m.map?.dispose()
       m.dispose()
+    }
+    for (const s of this.specks) {
+      s.mesh.geometry.dispose()
+      s.mat.dispose()
     }
     this.dimLayer.geometry.dispose()
     this.dimMat.dispose()
