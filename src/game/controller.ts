@@ -1,7 +1,11 @@
 import type { Action, BattleState, EngineEvent, PieceTrait, Sq } from '../engine/types'
 import {
-  applyMut, encounterDef, legalMovesFor, legalTargetsFor, newBattle, validate,
+  applyMut, decodeState, encounterDef, hashState, legalMovesFor, legalTargetsFor,
+  newBattle, validate,
 } from '../engine'
+import { GuestSession, HostSession, type GuestDelegate, type HostDelegate } from '../net/session'
+import { makeRoomCode, normalizeRoomCode } from '../net/protocol'
+import { joinRoom, supabaseAvailable } from '../net/supabaseRoom'
 import { loadContent } from '../content'
 import { AiClient } from '../ai/client'
 import type { MapNode, RunState } from '../meta/runState'
@@ -35,6 +39,18 @@ export class GameController implements BattleSceneHost {
   lastOutcome: { victory: boolean; reason: string } | null = null
   hasSave = false
 
+  // --- Кооп.
+  mode: 'solo' | 'coop-host' | 'coop-guest' = 'solo'
+  roomCode: string | null = null
+  lobbyStatus = ''
+  guestPresent = false
+  coopNotice = ''
+
+  private netHost: HostSession | null = null
+  private netGuest: GuestSession | null = null
+  private pendingPropose = false
+  private lastMetaSync = 0
+
   private ai = new AiClient()
   private scene: BattleScene | null = null
   private stage: Stage
@@ -57,12 +73,30 @@ export class GameController implements BattleSceneHost {
 
   private notify(): void {
     for (const fn of [...this.listeners]) fn()
+    this.syncMetaThrottled()
   }
 
   private setScreen(s: ScreenName): void {
     this.screen = s
     bus.emit('screen', { name: s })
     this.notify()
+    // Хост зеркалит мета-экраны гостю (бой синхронизируется отдельно).
+    if (this.mode === 'coop-host' && s !== 'battle') {
+      void this.netHost?.syncMeta()
+    }
+  }
+
+  /** Гость в коопе не принимает мета-решения — только смотрит. */
+  isSpectatorMeta(): boolean {
+    return this.mode === 'coop-guest'
+  }
+
+  private syncMetaThrottled(): void {
+    if (this.mode !== 'coop-host' || this.screen === 'battle') return
+    const now = Date.now()
+    if (now - this.lastMetaSync < 150) return
+    this.lastMetaSync = now
+    void this.netHost?.syncMeta()
   }
 
   // -------------------------------------------------------------------------
@@ -96,7 +130,161 @@ export class GameController implements BattleSceneHost {
   }
 
   toMenu(): void {
+    this.leaveCoop()
     this.setScreen('menu')
+  }
+
+  // -------------------------------------------------------------------------
+  // Кооп: лобби и сессии
+
+  coopAvailable(): boolean {
+    return supabaseAvailable()
+  }
+
+  openLobby(): void {
+    this.lobbyStatus = ''
+    this.roomCode = null
+    this.setScreen('lobby')
+  }
+
+  leaveCoop(): void {
+    this.netHost?.close()
+    this.netGuest?.close()
+    this.netHost = null
+    this.netGuest = null
+    this.mode = 'solo'
+    this.roomCode = null
+    this.guestPresent = false
+    this.pendingPropose = false
+    this.coopNotice = ''
+  }
+
+  /** Создать комнату (мы — хост). */
+  async hostRoom(): Promise<void> {
+    if (!supabaseAvailable()) { this.lobbyStatus = 'Supabase не настроен (.env)'; this.notify(); return }
+    this.lobbyStatus = 'Создаю комнату…'
+    this.notify()
+    try {
+      const code = makeRoomCode()
+      const transport = await joinRoom(code, { role: 'host', name: 'Художник' })
+      this.netHost = new HostSession(transport, this.hostDelegate(), 'Художник')
+      this.mode = 'coop-host'
+      this.roomCode = code
+      this.lobbyStatus = 'Комната создана. Жду друга…'
+    } catch (e) {
+      this.lobbyStatus = `Не удалось подключиться: ${(e as Error).message}`
+    }
+    this.notify()
+  }
+
+  /** Войти по коду (мы — гость). */
+  async joinAsGuest(rawCode: string): Promise<void> {
+    if (!supabaseAvailable()) { this.lobbyStatus = 'Supabase не настроен (.env)'; this.notify(); return }
+    const code = normalizeRoomCode(rawCode)
+    if (!code) { this.lobbyStatus = 'Код — 6 символов'; this.notify(); return }
+    this.lobbyStatus = 'Подключаюсь…'
+    this.notify()
+    try {
+      const transport = await joinRoom(code, { role: 'guest', name: 'Подмастерье' })
+      this.netGuest = new GuestSession(transport, this.guestDelegate(), 'Подмастерье')
+      this.mode = 'coop-guest'
+      this.roomCode = code
+      this.lobbyStatus = 'Подключено. Жду начала забега…'
+    } catch (e) {
+      this.lobbyStatus = `Не удалось подключиться: ${(e as Error).message}`
+    }
+    this.notify()
+  }
+
+  /** Хост запускает совместный забег из лобби. */
+  startCoopRun(): void {
+    if (this.mode !== 'coop-host') return
+    this.newRun()
+  }
+
+  private hostDelegate(): HostDelegate {
+    return {
+      getBattle: () => this.battle,
+      getRunJson: () => JSON.stringify(this.run),
+      getScreen: () => this.screen,
+      onGuestPropose: async (action: Action): Promise<boolean> => {
+        if (this.mode !== 'coop-host' || !this.battle || this.busy) return false
+        if (!this.isGuestTurn()) return false
+        const v = validate(this.battle, action, 0)
+        if (!v.ok) return false
+        await this.applyAndAnimate(action)
+        return true
+      },
+      onGuestPresence: (connected: boolean) => {
+        this.guestPresent = connected
+        if (connected && this.lobbyStatus) this.lobbyStatus = 'Друг в комнате!'
+        this.notify()
+      },
+    }
+  }
+
+  private guestDelegate(): GuestDelegate {
+    return {
+      applyRemote: async (action: Action): Promise<string> => {
+        if (!this.battle) return ''
+        this.pendingPropose = false
+        const events: EngineEvent[] = []
+        applyMut(this.battle, action, events)
+        bus.emit('engine', { events })
+        if (this.scene) await this.scene.onEngineEvents(events)
+        this.notify()
+        return hashState(this.battle)
+      },
+      loadSnapshot: async (runJson, battleJson, screen): Promise<void> => {
+        if (runJson) this.run = JSON.parse(runJson) as RunState
+        if (battleJson) {
+          this.battle = decodeState(battleJson)
+          if (!this.scene) {
+            this.scene = new BattleScene(this)
+            this.scene.mount(this.stage)
+            await collageIn(this.scene)
+          } else {
+            this.scene.syncImmediate()
+          }
+        }
+        if (screen !== 'battle' && this.scene) {
+          const scene = this.scene
+          this.scene = null
+          this.battle = null
+          await collageOut(scene)
+          scene.destroy()
+        }
+        this.setScreen(screen as ScreenName)
+      },
+      onDenied: (reason: string) => {
+        this.lobbyStatus = reason === 'buildMismatch'
+          ? 'Версии игры различаются — обновите страницу у обоих.'
+          : `Вход отклонён: ${reason}`
+        this.leaveCoop()
+        this.setScreen('lobby')
+      },
+      onRejected: () => {
+        this.pendingPropose = false
+        audio.sfx('lose', 0.25)
+        this.notify()
+      },
+      onDesync: () => {
+        this.coopNotice = 'Пересинхронизация…'
+        this.notify()
+        setTimeout(() => { this.coopNotice = ''; this.notify() }, 1500)
+      },
+    }
+  }
+
+  /** Чей сейчас командный ход: чётные — хост, нечётные — гость. */
+  private isGuestTurn(): boolean {
+    return this.battle !== null && this.battle.turn % 2 === 0
+  }
+
+  private isMyTurn(): boolean {
+    if (this.mode === 'solo') return true
+    const guestTurn = this.isGuestTurn()
+    return this.mode === 'coop-guest' ? guestTurn : !guestTurn
   }
 
   availableNodes(): MapNode[] {
@@ -105,7 +293,7 @@ export class GameController implements BattleSceneHost {
 
   /** Клик по узлу карты. */
   selectNode(nodeId: string): void {
-    if (!this.run) return
+    if (!this.run || this.isSpectatorMeta()) return
     const ok = availableNodes(this.run).some(n => n.id === nodeId)
     if (!ok) return
     this.run = chooseNode(this.run, nodeId)
@@ -159,7 +347,7 @@ export class GameController implements BattleSceneHost {
   // Лавка / событие / привал
 
   shopBuyCard(i: number): void {
-    if (!this.run || !this.shop) return
+    if (!this.run || !this.shop || this.isSpectatorMeta()) return
     const item = this.shop.cards[i]
     if (!item) return
     try {
@@ -172,7 +360,7 @@ export class GameController implements BattleSceneHost {
   }
 
   shopBuyRelic(i: number): void {
-    if (!this.run || !this.shop) return
+    if (!this.run || !this.shop || this.isSpectatorMeta()) return
     const item = this.shop.relics[i]
     if (!item) return
     try {
@@ -185,7 +373,7 @@ export class GameController implements BattleSceneHost {
   }
 
   shopBuyRecruit(): void {
-    if (!this.run || !this.shop?.recruit) return
+    if (!this.run || !this.shop?.recruit || this.isSpectatorMeta()) return
     const r = this.shop.recruit
     try {
       this.run = buyRecruit(this.run, r.type, r.price, r.name)
@@ -197,7 +385,7 @@ export class GameController implements BattleSceneHost {
   }
 
   shopRemoveCard(index: number): void {
-    if (!this.run || !this.shop) return
+    if (!this.run || !this.shop || this.isSpectatorMeta()) return
     try {
       this.run = removeCard(this.run, index, this.shop.removalPrice)
       this.shop.removalPrice = 9999 // одно удаление за визит
@@ -208,11 +396,12 @@ export class GameController implements BattleSceneHost {
   }
 
   leaveShop(): void {
+    if (this.isSpectatorMeta()) return
     this.completeAndBackToMap('shop')
   }
 
   eventChoice(i: number): void {
-    if (!this.run || !this.event) return
+    if (!this.run || !this.event || this.isSpectatorMeta()) return
     const choice = this.event.choices[i]
     if (!choice) return
     if (choice.condition && !choice.condition(this.run)) return
@@ -221,13 +410,13 @@ export class GameController implements BattleSceneHost {
   }
 
   restTrain(rid: string, traitId: string): void {
-    if (!this.run) return
+    if (!this.run || this.isSpectatorMeta()) return
     this.run = trainPiece(this.run, rid, traitId)
     this.completeAndBackToMap(`train:${rid}:${traitId}`)
   }
 
   restUpgrade(cardIndex: number): void {
-    if (!this.run) return
+    if (!this.run || this.isSpectatorMeta()) return
     try {
       this.run = upgradeCard(this.run, cardIndex)
       this.completeAndBackToMap(`upgrade:${cardIndex}`)
@@ -238,7 +427,7 @@ export class GameController implements BattleSceneHost {
   // Награда после боя
 
   pickRewardCard(def: string | null): void {
-    if (!this.run || !this.reward) return
+    if (!this.run || !this.reward || this.isSpectatorMeta()) return
     if (def) this.run = gainCard(this.run, def)
     if (this.reward.relic) this.run = gainRelic(this.run, this.reward.relic)
     this.reward = null
@@ -265,7 +454,10 @@ export class GameController implements BattleSceneHost {
   }
 
   inputEnabled(): boolean {
-    return !this.busy && this.battle?.active === 0 && !this.battle.result
+    if (this.busy || this.battle?.active !== 0 || this.battle.result) return false
+    if (!this.isMyTurn()) return false
+    if (this.mode === 'coop-guest' && this.pendingPropose) return false
+    return true
   }
 
   legalMovesFor(pieceId: number): Sq[] {
@@ -282,6 +474,13 @@ export class GameController implements BattleSceneHost {
     if (!v.ok) {
       audio.sfx('lose', 0.25)
       return false
+    }
+    if (this.mode === 'coop-guest') {
+      // Гость не применяет локально — предлагает хосту.
+      this.pendingPropose = true
+      this.netGuest?.propose(action)
+      this.notify()
+      return true
     }
     void this.applyAndAnimate(action)
     return true
@@ -334,6 +533,9 @@ export class GameController implements BattleSceneHost {
     this.scene.mount(this.stage)
     this.setScreen('battle')
     audio.sfx('card', 0.6)
+    if (this.mode === 'coop-host' && this.netHost) {
+      await this.netHost.announceBattleStart(this.battle)
+    }
     await collageIn(this.scene)
 
     // Если после реплея ход врага — продолжаем его.
@@ -350,6 +552,7 @@ export class GameController implements BattleSceneHost {
     try {
       const events: EngineEvent[] = []
       applyMut(this.battle, action, events)
+      this.netHost?.announce(action, this.battle)
       this.run = appendBattleAction(this.run, action)
       saveRun(this.run)
       bus.emit('engine', { events })
@@ -390,6 +593,7 @@ export class GameController implements BattleSceneHost {
       if (!v.ok) action = { t: 'endTurn' }
       const events: EngineEvent[] = []
       applyMut(battle, action, events)
+      this.netHost?.announce(action, battle)
       this.run = appendBattleAction(this.run as RunState, action)
       saveRun(this.run)
       bus.emit('engine', { events })

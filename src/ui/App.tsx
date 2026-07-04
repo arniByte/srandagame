@@ -23,8 +23,19 @@ export function App({ game }: { game: GameController }) {
     case 'reward': return <Reward game={game} />
     case 'gameover': return <End game={game} victory={false} />
     case 'victory': return <End game={game} victory={true} />
+    case 'lobby': return <Lobby game={game} />
     default: return null
   }
+}
+
+/** Плашка гостя на мета-экранах: решает хост. */
+function SpectatorBadge({ game }: { game: GameController }) {
+  if (!game.isSpectatorMeta()) return null
+  return (
+    <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#1d1d1b;color:#f5efe0;padding:6px 18px;font-size:14px;clip-path:polygon(2% 10%,98% 0,99% 88%,1% 98%)">
+      Путь выбирает Художник-хост…
+    </div>
+  )
 }
 
 function Menu({ game }: { game: GameController }) {
@@ -40,6 +51,9 @@ function Menu({ game }: { game: GameController }) {
           {game.hasSave && (
             <button class="btn" onClick={() => game.continueRun()}>Продолжить</button>
           )}
+          <button class="btn blue" disabled={!game.coopAvailable()}
+            title={game.coopAvailable() ? '' : 'Не настроен Supabase (.env)'}
+            onClick={() => game.openLobby()}>Кооп с другом</button>
         </div>
         <p class="small">
           Веди армию-аппликацию к замку. Ходи фигурами, играй карты за краску,
@@ -77,6 +91,7 @@ function MapScreen({ game }: { game: GameController }) {
 
   return (
     <div class="screen">
+      <SpectatorBadge game={game} />
       <div class="map-wrap">
         <div style="display:flex;justify-content:space-between;padding:4px 12px;align-items:baseline">
           <h2>Путь к замку · акт {run.act}</h2>
@@ -127,12 +142,72 @@ function MapScreen({ game }: { game: GameController }) {
 // ---------------------------------------------------------------------------
 
 function BattleHud({ game }: { game: GameController }) {
+  const coop = game.mode !== 'solo'
+  const myTurn = game.inputEnabled()
   return (
     <div class="screen transparent">
       <div class="battle-hud">
+        {coop && (
+          <span style={myTurn ? 'color:#f2a20c' : 'opacity:.75'}>
+            {game.battle?.active === 0
+              ? (myTurn ? '— ваш ход —' : 'ходит напарник…')
+              : ''}
+          </span>
+        )}
+        {game.coopNotice && <span>{game.coopNotice}</span>}
         <span class="gold">◉ {game.run?.gold ?? 0}</span>
-        <button class="btn ghost" style="font-size:14px;padding:4px 10px"
-          onClick={() => game.concede()}>сдаться</button>
+        {game.mode !== 'coop-guest' && (
+          <button class="btn ghost" style="font-size:14px;padding:4px 10px"
+            onClick={() => game.concede()}>сдаться</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+function Lobby({ game }: { game: GameController }) {
+  const [code, setCode] = useState('')
+  return (
+    <div class="screen">
+      <div class="paper" style="text-align:center;max-width:480px">
+        <h2>Кооп: общая армия</h2>
+        <p class="small">
+          Вы с другом делите одну армию и одну колоду: ходы по очереди —
+          нечётные твои, чётные — друга. Против вас — ИИ.
+        </p>
+
+        {game.roomCode && game.mode === 'coop-host' ? (
+          <>
+            <p>Код комнаты — продиктуй другу:</p>
+            <h1 class="logo" style="font-size:52px;letter-spacing:.25em">{game.roomCode}</h1>
+            <p class="small">{game.lobbyStatus}</p>
+            <button class="btn red" disabled={!game.guestPresent}
+              onClick={() => game.startCoopRun()}>
+              {game.guestPresent ? 'Начать забег' : 'Ждём друга…'}
+            </button>
+          </>
+        ) : game.mode === 'coop-guest' ? (
+          <p>{game.lobbyStatus}</p>
+        ) : (
+          <>
+            <button class="btn red" onClick={() => void game.hostRoom()}>Создать комнату</button>
+            <div class="row" style="margin-top:10px;align-items:center">
+              <input
+                value={code}
+                onInput={e => setCode((e.target as HTMLInputElement).value)}
+                placeholder="КОД КОМНАТЫ"
+                style="font-family:inherit;font-size:20px;padding:10px;width:170px;text-transform:uppercase;border:2px solid #1d1d1b;background:#fff"
+              />
+              <button class="btn blue" onClick={() => void game.joinAsGuest(code)}>Войти</button>
+            </div>
+            {game.lobbyStatus && <p class="small">{game.lobbyStatus}</p>}
+          </>
+        )}
+        <div style="margin-top:14px">
+          <button class="btn ghost" onClick={() => game.toMenu()}>Назад</button>
+        </div>
       </div>
     </div>
   )
@@ -145,6 +220,7 @@ function Shop({ game }: { game: GameController }) {
   if (!run || !shop) return null
   return (
     <div class="screen">
+      <SpectatorBadge game={game} />
       <div class="paper" style="text-align:center">
         <h2>Лавка старьёвщика</h2>
         <p class="small">«Краденое? Что вы. Найденное». <span class="gold-badge">◉ {run.gold}</span></p>
@@ -208,6 +284,7 @@ function EventScreen({ game }: { game: GameController }) {
   if (!ev || !run) return null
   return (
     <div class="screen">
+      <SpectatorBadge game={game} />
       <div class="paper" style="max-width:520px">
         <h2>{ev.title}</h2>
         <p>{ev.text}</p>
@@ -232,6 +309,7 @@ function Rest({ game }: { game: GameController }) {
   if (!run) return null
   return (
     <div class="screen">
+      <SpectatorBadge game={game} />
       <div class="paper" style="text-align:center;max-width:560px">
         <h2>Привал у костра из рам</h2>
         <p class="small">Выбери одно: обучить фигуру или улучшить карту.</p>
@@ -280,6 +358,7 @@ function Reward({ game }: { game: GameController }) {
   if (!r) return null
   return (
     <div class="screen">
+      <SpectatorBadge game={game} />
       <div class="paper" style="text-align:center">
         <h2>Трофеи боя</h2>
         <p class="gold-badge">+◉ {r.gold}</p>
