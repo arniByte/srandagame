@@ -19,8 +19,16 @@
       }
       #diorama { z-index: 0; pointer-events: none; }
       #game { z-index: 1; }
+      /* Оверлей сам событий не ловит; интерактивность включают экраны в styles.css. */
       #ui { z-index: 2; pointer-events: none; }
-      #ui * { pointer-events: auto; }
+      /* Киношная виньетка поверх сцены, под UI. */
+      #app::after {
+        content: '';
+        position: absolute; inset: 0; z-index: 1;
+        pointer-events: none;
+        background: radial-gradient(ellipse 105% 90% at 50% 42%,
+          transparent 58%, rgba(10, 8, 5, 0.34) 100%);
+      }
       #boot {
         position: absolute; inset: 0; z-index: 3;
         display: flex; align-items: center; justify-content: center;
@@ -37,6 +45,6 @@
       <div id="ui"></div>
       <div id="boot">CHECKMATISSE</div>
     </div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

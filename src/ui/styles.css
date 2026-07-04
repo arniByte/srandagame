@@ -1,0 +1,139 @@
+/* CHECKMATISSE — бумажный коллаж поверх игры. */
+
+:root {
+  --red: #d93829;
+  --ink: #1d1d1b;
+  --ochre: #f2a20c;
+  --blue: #2e6cb5;
+  --green: #2c8c57;
+  --paper: #f5efe0;
+  --dark: #14120f;
+}
+
+#ui { font-family: 'Neucha', Georgia, 'Times New Roman', serif; color: var(--ink); }
+
+h1, h2, h3, h4, .logo, button.btn {
+  font-family: 'Amatic SC', 'Neucha', Georgia, serif;
+  letter-spacing: 0.04em;
+}
+.gold-badge, .cost, .price { font-family: 'Caveat', 'Neucha', serif; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px;
+  background: rgba(20, 18, 15, 0.55);
+  pointer-events: auto;
+}
+/* Боевой HUD: сам экран прозрачен для мыши — кликается канвас под ним. */
+.screen.transparent { background: transparent; pointer-events: none !important; }
+.screen.transparent > * { pointer-events: auto; }
+
+/* Бумажная карточка с рваным краем. */
+.paper {
+  background: var(--paper);
+  background-image: var(--paper-img, none);
+  background-size: 100% 100%;
+  padding: 50px 72px 58px;
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.35);
+  clip-path: polygon(
+    0.8% 3%, 3% 0.4%, 22% 1.6%, 41% 0.2%, 62% 1.8%, 83% 0.6%, 97% 1.4%, 99.4% 4%,
+    98.6% 24%, 99.8% 47%, 98.4% 68%, 99.6% 88%, 97.5% 98%, 79% 99%, 58% 98%,
+    37% 99.6%, 17% 98.4%, 2.5% 99.2%, 0.4% 96%, 1.6% 74%, 0.2% 52%, 1.4% 28%
+  );
+  max-width: min(720px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+}
+
+h1.logo {
+  font-size: clamp(38px, 7vw, 72px);
+  letter-spacing: 0.06em;
+  margin: 0 0 4px;
+  line-height: 1;
+}
+.logo .c1 { color: var(--red); }
+.logo .c2 { color: var(--ink); }
+.logo .c3 { color: var(--ochre); }
+.logo .c4 { color: var(--blue); }
+.tagline { opacity: 0.75; margin: 0 0 18px; font-style: italic; }
+
+button.btn {
+  font-size: 24px;
+  padding: 12px 26px;
+  margin: 5px;
+  border: none;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.3);
+  clip-path: polygon(2% 8%, 98% 2%, 99% 90%, 3% 97%);
+  transition: transform 0.08s ease-out;
+}
+button.btn:hover { transform: translateY(-2px) rotate(-0.6deg); }
+button.btn:active { transform: translateY(1px); }
+button.btn.red { background: var(--red); }
+button.btn.ochre { background: var(--ochre); color: var(--ink); }
+button.btn.blue { background: var(--blue); }
+button.btn.ghost { background: transparent; color: var(--paper); box-shadow: none; }
+button.btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+.row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: stretch; }
+
+/* Карта забега */
+.map-wrap {
+  width: min(860px, 94vw); height: 82vh;
+  overflow-y: auto; overflow-x: hidden;
+  background: rgba(245, 239, 224, 0.94);
+  background-image: var(--paper-img, none);
+  background-size: 100% auto;
+  box-shadow: 6px 8px 0 rgba(0, 0, 0, 0.35);
+  padding: 10px;
+}
+.map-svg { width: 100%; display: block; }
+.map-node { cursor: default; }
+.map-node.available { cursor: pointer; }
+.map-node.available circle { stroke: var(--red); stroke-width: 3; animation: pulse 1.2s infinite alternate; }
+.map-node.visited { opacity: 0.35; }
+@keyframes pulse { from { r: 15; } to { r: 17; } }
+
+/* Мини-карточки (награды, лавка) */
+.mini-card {
+  width: 148px; background: var(--paper);
+  border: 2px solid var(--ink);
+  padding: 10px; text-align: center; cursor: pointer;
+  box-shadow: 4px 5px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease-out;
+  clip-path: polygon(1.5% 2%, 98% 0.8%, 99.2% 97%, 0.8% 99%);
+}
+.mini-card:hover { transform: translateY(-4px) rotate(-1deg); }
+.mini-card .cost { color: var(--blue); font-weight: bold; }
+.mini-card .price { color: var(--ochre); font-weight: bold; }
+.mini-card .rarity-uncommon { color: var(--blue); }
+.mini-card .rarity-rare { color: var(--ochre); }
+.mini-card h4 { margin: 4px 0; font-size: 22px; }
+.mini-card p { margin: 4px 0; font-size: 14px; opacity: 0.9; }
+
+/* HUD боя (DOM-часть) */
+.battle-hud {
+  position: absolute; top: 8px; right: 14px;
+  display: flex; gap: 14px; align-items: center;
+  color: var(--paper); font-size: 17px;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
+}
+.battle-hud .gold { color: var(--ochre); }
+
+.roster-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.roster-chip {
+  background: rgba(29,29,27,0.08);
+  padding: 6px 12px; cursor: pointer;
+  border: 2px solid transparent;
+}
+.roster-chip:hover, .roster-chip.sel { border-color: var(--red); }
+
+.deck-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-height: 30vh; overflow: auto; }
+.gold-badge { color: var(--ochre); font-weight: bold; font-size: 20px; }
+h2 { margin: 6px 0 2px; font-size: 34px; }
+h4 { font-size: 24px; margin: 8px 0 4px; }
+p.small { font-size: 15px; opacity: 0.85; max-width: 480px; margin-left: auto; margin-right: auto; }
