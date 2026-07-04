@@ -509,6 +509,15 @@ export class GameController implements BattleSceneHost {
     return true
   }
 
+  /** Дебаг-хуки для e2e с настоящей мышью (?test=1). */
+  debugTileXY(sq: number): { x: number; y: number } | null {
+    return this.scene?.debugScreenPos(sq) ?? null
+  }
+
+  debugFirstCard(): { iid: number; x: number; y: number } | null {
+    return this.scene?.debugFirstCard() ?? null
+  }
+
   /** Сдаться (кнопка в DOM-оверлее боя). */
   concede(): void {
     if (!this.battle || this.battle.result) return

@@ -1,6 +1,7 @@
 import { Application, Container } from 'pixi.js'
 import { bus } from '../core/bus'
 import { viewport } from '../core/resize'
+import { resolveQuality } from '../core/settings'
 import { ticker, TICK } from '../core/ticker'
 import { initPlaceholders } from '../assets/placeholders'
 
@@ -28,7 +29,8 @@ export async function initStage(canvas: HTMLCanvasElement): Promise<Stage> {
     canvas,
     width: viewport.w,
     height: viewport.h,
-    resolution: viewport.dpr,
+    // high: суперсэмплинг до 2x — чёткий текст и края даже на dpr=1.
+    resolution: resolveQuality() === 'high' ? Math.max(viewport.dpr, 2) : viewport.dpr,
     autoDensity: true,
     backgroundAlpha: 0,
     antialias: true,
@@ -58,7 +60,7 @@ export async function initStage(canvas: HTMLCanvasElement): Promise<Stage> {
   })
 
   const offResize = bus.on('resize', ({ w, h, dpr }) => {
-    app.renderer.resolution = dpr
+    app.renderer.resolution = resolveQuality() === 'high' ? Math.max(dpr, 2) : dpr
     app.renderer.resize(w, h)
   })
 

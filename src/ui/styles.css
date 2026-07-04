@@ -24,8 +24,10 @@ h1, h2, h3, h4, .logo, button.btn {
   align-items: center; justify-content: center;
   gap: 18px;
   background: rgba(20, 18, 15, 0.55);
+  pointer-events: auto;
 }
-.screen.transparent { background: transparent; pointer-events: none; }
+/* Боевой HUD: сам экран прозрачен для мыши — кликается канвас под ним. */
+.screen.transparent { background: transparent; pointer-events: none !important; }
 .screen.transparent > * { pointer-events: auto; }
 
 /* Бумажная карточка с рваным краем. */
@@ -110,14 +112,14 @@ button.btn:disabled { opacity: 0.4; cursor: default; transform: none; }
 .mini-card .price { color: var(--ochre); font-weight: bold; }
 .mini-card .rarity-uncommon { color: var(--blue); }
 .mini-card .rarity-rare { color: var(--ochre); }
-.mini-card h4 { margin: 4px 0; font-size: 17px; }
-.mini-card p { margin: 4px 0; font-size: 13px; opacity: 0.85; }
+.mini-card h4 { margin: 4px 0; font-size: 22px; }
+.mini-card p { margin: 4px 0; font-size: 14px; opacity: 0.9; }
 
 /* HUD боя (DOM-часть) */
 .battle-hud {
   position: absolute; top: 8px; right: 14px;
   display: flex; gap: 14px; align-items: center;
-  color: var(--paper); font-size: 15px;
+  color: var(--paper); font-size: 17px;
   text-shadow: 1px 1px 0 rgba(0,0,0,0.6);
 }
 .battle-hud .gold { color: var(--ochre); }

@@ -1,4 +1,4 @@
-import { Container, Rectangle, type FederatedPointerEvent } from 'pixi.js'
+import { Container, type FederatedPointerEvent } from 'pixi.js'
 import type { Action, BattleState, Sq } from '../../engine/types'
 import { cardDef } from '../../engine'
 import { ticker, TICK } from '../../core/ticker'
@@ -46,6 +46,9 @@ export class DragController {
   private ghosted = false
   private offTick: () => void
   private handLayerRef: Container
+  private onDomMove!: (e: PointerEvent) => void
+  private onDomUp!: () => void
+  private onDomContext!: (e: MouseEvent) => void
 
   constructor(
     private host: DragHost,
@@ -53,13 +56,16 @@ export class DragController {
     private board: DragBoardApi,
   ) {
     this.handLayerRef = stage.handLayer
-    const st = stage.app.stage
-    st.eventMode = 'static'
-    st.hitArea = new Rectangle(-4096, -4096, 8192, 8192)
-    st.on('pointermove', this.onMove, this)
-    st.on('pointerup', this.onUp, this)
-    st.on('pointerupoutside', this.onUp, this)
-    st.on('rightdown', this.onCancelGesture, this)
+    // ВАЖНО: НИКАКОГО hitArea на app.stage — он отменяет hit-testing детей
+    // и глушит весь ввод сцены. Глобальное слежение за курсором — через DOM.
+    this.onDomMove = (e: PointerEvent) => { this.pointer.x = e.clientX; this.pointer.y = e.clientY }
+    this.onDomUp = () => this.onUp()
+    this.onDomContext = (e: MouseEvent) => {
+      if (this.active) { e.preventDefault(); this.onCancelGesture() }
+    }
+    window.addEventListener('pointermove', this.onDomMove)
+    window.addEventListener('pointerup', this.onDomUp)
+    window.addEventListener('contextmenu', this.onDomContext)
 
     this.offTick = ticker.add((dt) => this.update(dt), TICK.TWEEN)
   }
@@ -86,11 +92,6 @@ export class DragController {
     this.vel.y = 0
     this.legal = this.host.legalTargetsFor(card.iid)
     audio.sfx('card')
-  }
-
-  private onMove(e: FederatedPointerEvent): void {
-    this.pointer.x = e.global.x
-    this.pointer.y = e.global.y
   }
 
   private update(dt: number): void {
@@ -222,10 +223,8 @@ export class DragController {
 
   destroy(): void {
     this.offTick()
-    const st = this.stage.app.stage
-    st.off('pointermove', this.onMove, this)
-    st.off('pointerup', this.onUp, this)
-    st.off('pointerupoutside', this.onUp, this)
-    st.off('rightdown', this.onCancelGesture, this)
+    window.removeEventListener('pointermove', this.onDomMove)
+    window.removeEventListener('pointerup', this.onDomUp)
+    window.removeEventListener('contextmenu', this.onDomContext)
   }
 }

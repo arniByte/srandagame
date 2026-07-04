@@ -7,7 +7,7 @@ import { ticker, TICK } from '../../core/ticker'
 import { tornPoly } from '../../assets/paperEdge'
 import { SM_HZ, visualRng } from '../anim/stopmotion'
 import { killTweensOf, tween, wait } from '../anim/tween'
-import { cellAt, scaleAt, sqToXY, xyToSq, type Projection } from './projection'
+import { PERSP, cellAt, scaleAt, sqToXY, xyToSq, type Projection } from './projection'
 
 /** Дизайн-размер тайла в текстуре (см. placeholders.tileTexture). */
 const TILE_DESIGN = 60
@@ -20,6 +20,8 @@ export class BoardView {
   container = new Container()
   /** Клик по клетке (сюда роутится ВЕСЬ ввод по доске). */
   onTileClick: ((sq: Sq) => void) | null = null
+  /** Ховер клетки (для курсора и подсказок); -1 = ушли с доски. */
+  onTileHover: ((sq: Sq) => void) | null = null
 
   private tilesLayer = new Container()
   private hintsLayer = new Container()
@@ -36,16 +38,45 @@ export class BoardView {
   private lastBreathStep = -1
   private offTick: () => void
 
+  // Параллакс/ховер.
+  private parX = 0
+  private pointerLX = -99999
+  private pointerLY = -99999
+  private hoverSq: Sq = -1
+  private hoverG = new Graphics()
+
   constructor() {
     this.container.addChild(this.tilesLayer, this.hintsLayer)
-    this.hintsLayer.addChild(this.telegraphG, this.selectedG, this.moveDots, this.targetFrames, this.firstMarkG)
+    this.hintsLayer.addChild(this.telegraphG, this.hoverG, this.selectedG, this.moveDots, this.targetFrames, this.firstMarkG)
 
     this.container.eventMode = 'static'
     this.container.on('pointertap', (e) => {
       if (!this.proj || !this.onTileClick) return
       const local = e.getLocalPosition(this.tilesLayer)
       const sq = xyToSq(this.proj, local.x, local.y)
+      ;(window as unknown as Record<string, unknown>).__lastTap = { x: local.x, y: local.y, sq }
       if (sq !== -1) this.onTileClick(sq)
+    })
+    this.container.on('pointermove', (e) => {
+      if (!this.proj) return
+      const local = e.getLocalPosition(this.tilesLayer)
+      this.pointerLX = local.x
+      this.pointerLY = local.y
+      const sq = xyToSq(this.proj, local.x, local.y)
+      if (sq !== this.hoverSq) {
+        this.hoverSq = sq
+        this.drawHover()
+        this.onTileHover?.(sq)
+      }
+    })
+    this.container.on('pointerleave', () => {
+      this.pointerLX = -99999
+      this.pointerLY = -99999
+      if (this.hoverSq !== -1) {
+        this.hoverSq = -1
+        this.drawHover()
+        this.onTileHover?.(-1)
+      }
     })
 
     // Пульс рамок-целей — плавный (это UI-подсветка, не стоп-моушен).
@@ -58,12 +89,28 @@ export class BoardView {
       // Дыхание бумаги: едва заметное степпед-покачивание тайлов (3 шага/с),
       // у каждого своя фаза — коллаж «живёт», но не ёрзает.
       const step = Math.floor(this.pulseT * 3)
-      if (step !== this.lastBreathStep) {
-        this.lastBreathStep = step
+      const stepChanged = step !== this.lastBreathStep
+      this.lastBreathStep = step
+
+      // Глубинный параллакс рядов + «рябь» плиток под курсором.
+      // Через pivot — не конфликтует с твинами позиций (Куратор/клей).
+      const p = this.proj
+      if (p) {
+        const sigma2 = 2 * Math.pow(p.cell * 1.4, 2)
         for (const [sq, sp] of this.tiles) {
-          const base = (visualRng(sq + 7)() * 2 - 1) * 0.02
-          const phase = (sq * 0.61) % 6.28
-          sp.rotation = base + Math.sin(step * 0.7 + phase) * 0.006
+          if (stepChanged) {
+            const base = (visualRng(sq + 7)() * 2 - 1) * 0.02
+            const phase = (sq * 0.61) % 6.28
+            sp.rotation = base + Math.sin(step * 0.7 + phase) * 0.006
+          }
+          const y = sqY(sq)
+          const depth = Math.min(1, (1 - scaleAt(p, y)) / PERSP)
+          const shift = this.parX * 2.4 * depth
+          const dx = sp.x - this.pointerLX
+          const dy = sp.y - this.pointerLY
+          const lift = 9 * Math.exp(-(dx * dx + dy * dy) / sigma2)
+          sp.pivot.x = -shift / sp.scale.x
+          sp.pivot.y = lift / sp.scale.y
         }
       }
     }, TICK.TWEEN)
@@ -83,6 +130,8 @@ export class BoardView {
         if (tileAt(b, sq) !== HOLE) this.addTile(sq)
       }
     }
+    this.hoverSq = -1
+    this.hoverG.clear()
     this.container.hitArea = new Rectangle(
       proj.cx - (proj.bw * proj.cell) / 2, proj.rowTop[0] ?? 0,
       proj.bw * proj.cell,
@@ -96,6 +145,30 @@ export class BoardView {
 
   getProjection(): Projection | null {
     return this.proj
+  }
+
+  /** Сглаженный горизонтальный параллакс сцены (из battleScene). */
+  setParallax(parX: number): void {
+    this.parX = parX
+  }
+
+  /** Сдвиг ряда для согласования фигур с плитками. */
+  rowShift(y: number): number {
+    const p = this.proj
+    if (!p) return 0
+    const depth = Math.min(1, (1 - scaleAt(p, y)) / PERSP)
+    return this.parX * 2.4 * depth
+  }
+
+  private drawHover(): void {
+    this.hoverG.clear()
+    const p = this.proj
+    if (!p || this.hoverSq === -1 || !this.tiles.has(this.hoverSq)) return
+    const { x, y } = sqToXY(p, this.hoverSq)
+    const cw = cellAt(p, sqY(this.hoverSq)), ch = p.cellH * scaleAt(p, sqY(this.hoverSq))
+    this.hoverG
+      .roundRect(x - cw / 2 + 2, y - ch / 2 + 2, cw - 4, ch - 4, 5)
+      .stroke({ width: 2, color: 0xf5efe0, alpha: 0.55 })
   }
 
   /** Добавить/убрать тайлы после изменений террейна (без анимаций). */

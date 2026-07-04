@@ -67,6 +67,9 @@ class AssetLibrary {
       try {
         const alias = `${key}@${this.rev}`
         const tex = await Assets.load<Texture>({ alias, src: entry.src })
+        // Мипмапы: спрайты сильно уменьшаются — без них края «звенят».
+        tex.source.autoGenerateMipmaps = true
+        tex.source.update()
         this.loaded.set(key, tex)
         keys.push(key)
       } catch { /* битый ассет не должен ломать бой — остаётся плейсхолдер */ }

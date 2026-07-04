@@ -52,11 +52,11 @@ export class CardView {
     illus.scale.set(fit)
     this.root.addChild(illus)
 
-    const name = new Text({
+    const name = new Text({ resolution: 2,
       text: def.name,
       style: {
         fontFamily: '"Amatic SC", Georgia, serif',
-        fontSize: 19,
+        fontSize: 22,
         fontWeight: 'bold',
         fill: cssColor(PAL.ink),
         align: 'center',
@@ -67,11 +67,11 @@ export class CardView {
     if (name.width > CARD_W - 20) name.scale.set((CARD_W - 20) / name.width)
     this.root.addChild(name)
 
-    const desc = new Text({
+    const desc = new Text({ resolution: 2,
       text: def.desc,
       style: {
         fontFamily: 'Neucha, Georgia, serif',
-        fontSize: 10,
+        fontSize: 12,
         fill: '#4a453b',
         align: 'center',
         wordWrap: true,
@@ -89,11 +89,11 @@ export class CardView {
     drop.position.set(-CARD_W / 2 + 16, -CARD_H / 2 + 18)
     this.root.addChild(drop)
 
-    this.costText = new Text({
+    this.costText = new Text({ resolution: 2,
       text: String(cost),
       style: {
         fontFamily: 'Caveat, Georgia, serif',
-        fontSize: 17,
+        fontSize: 19,
         fontWeight: '700',
         fill: cssColor(PAL.paper),
       },

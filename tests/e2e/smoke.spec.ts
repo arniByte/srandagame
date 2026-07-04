@@ -5,23 +5,6 @@ import { expect, test } from '@playwright/test'
  * Управление через window.__cm (?test=1): стабильнее канвас-кликов.
  */
 
-declare global {
-  interface Window {
-    __cm: {
-      screen: string
-      battle: { result: unknown; turn: number; active: number; phase: string; movedThisTurn: boolean; promoting: { piece: number; options: string[] } | null; pieces: { id: number; owner: number; pos: number }[] } | null
-      run: { gold: number; roster: unknown[] } | null
-      newRun(seed?: string): void
-      availableNodes(): { id: string; kind: string }[]
-      selectNode(id: string): void
-      inputEnabled(): boolean
-      legalMovesFor(id: number): number[]
-      tryAction(a: unknown): boolean
-      getState(): { movedThisTurn: boolean; phase: string; promoting: { piece: number; options: string[] } | null; pieces: { id: number; owner: number }[] }
-    }
-  }
-}
-
 test('полный цикл: меню → карта → бой → ходы обеих сторон', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', e => errors.push(e.message))

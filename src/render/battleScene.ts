@@ -118,7 +118,27 @@ export class BattleScene {
         // Рука — ближе к камере: движется чуть сильнее и в ту же сторону.
         st.handLayer.position.set(this.parX * 1.6, this.parY * 1.3)
       }
+      // Глубина: дальние ряды сдвигаются сильнее (плитки — в boardView,
+      // фигуры — здесь, через pivot, чтобы не мешать твинам ходов).
+      this.boardView.setParallax(this.parX)
+      for (const view of this.pieceViews.values()) {
+        const piece = this.statePiece(view.id)
+        if (piece) view.root.pivot.x = -this.boardView.rowShift(sqY(piece.pos))
+      }
     }, TICK.TWEEN))
+
+    // Курсор-указатель над своими фигурами и доступными ходами.
+    this.boardView.onTileHover = (sq) => {
+      const canvas = this.stage?.app.canvas as HTMLCanvasElement | undefined
+      if (!canvas) return
+      let pointer = false
+      if (sq !== -1 && this.host.inputEnabled()) {
+        const state = this.host.getState()
+        pointer = state.pieces.some(pp => pp.pos === sq && pp.owner === 0) ||
+          this.selectedMoves.includes(sq)
+      }
+      canvas.style.cursor = pointer ? 'pointer' : 'default'
+    }
 
     this.layout(viewport.w, viewport.h)
     this.syncImmediate()
@@ -476,7 +496,7 @@ export class BattleScene {
   // HUD
 
   private buildHud(): void {
-    this.turnText = new Text({
+    this.turnText = new Text({ resolution: 2,
       text: '',
       style: {
         fontFamily: '"Amatic SC", Georgia, serif', fontSize: 24, fontWeight: '700',
@@ -485,7 +505,7 @@ export class BattleScene {
     })
     this.turnText.position.set(16, HUD_TOP)
 
-    this.objText = new Text({
+    this.objText = new Text({ resolution: 2,
       text: '',
       style: { fontFamily: 'Neucha, Georgia, serif', fontSize: 15, fill: '#bfb7a4' },
     })
@@ -494,7 +514,7 @@ export class BattleScene {
     const btnBg = new Graphics()
     btnBg.roundRect(0, 0, 148, 44, 8).fill(PAL.vermilion)
     btnBg.roundRect(3, 3, 142, 38, 6).stroke({ width: 1.5, color: PAL.paper, alpha: 0.5 })
-    const btnText = new Text({
+    const btnText = new Text({ resolution: 2,
       text: 'Конец хода',
       style: {
         fontFamily: '"Amatic SC", Georgia, serif', fontSize: 23, fontWeight: '700',
@@ -543,7 +563,7 @@ export class BattleScene {
       }
       this.paintRow.addChild(drop)
     }
-    const label = new Text({
+    const label = new Text({ resolution: 2,
       text: `${side.paint}/${side.paintMax}`,
       style: { fontFamily: 'Neucha, Georgia, serif', fontSize: 15, fill: '#bfb7a4' },
     })
@@ -567,7 +587,7 @@ export class BattleScene {
     let name = defId
     try { name = cardDef(defId).name } catch { /* и так сойдёт */ }
     const chip = new Container()
-    const t = new Text({
+    const t = new Text({ resolution: 2,
       text: `Противник: «${name}»`,
       style: {
         fontFamily: '"Amatic SC", Georgia, serif', fontSize: 22, fontWeight: '700',
@@ -618,7 +638,7 @@ export class BattleScene {
     dim.eventMode = 'static' // блокирует клики по доске
     overlay.addChild(dim)
 
-    const title = new Text({
+    const title = new Text({ resolution: 2,
       text: 'Мазок дошёл до края — выберите мутацию',
       style: {
         fontFamily: '"Amatic SC", Georgia, serif', fontSize: 30, fontWeight: '700',
@@ -646,7 +666,7 @@ export class BattleScene {
 
       let label = into
       try { label = pieceType(into).name } catch { /* имя не критично */ }
-      const name = new Text({
+      const name = new Text({ resolution: 2,
         text: label,
         style: {
           fontFamily: '"Amatic SC", Georgia, serif', fontSize: 23, fontWeight: '700',
@@ -682,7 +702,7 @@ export class BattleScene {
     const g = new Graphics()
     g.rect(-this.lastW, -70, this.lastW * 2, 140).fill({ color: PAL.bg, alpha: 0.78 })
     banner.addChild(g)
-    const t = new Text({
+    const t = new Text({ resolution: 2,
       text: win ? 'КАРТИНА ЗАВЕРШЕНА' : 'КОЛЛАЖ РАЗОРВАН',
       style: {
         fontFamily: '"Amatic SC", Georgia, serif', fontSize: 58, fontWeight: '700',
@@ -692,7 +712,7 @@ export class BattleScene {
     })
     t.anchor.set(0.5)
     banner.addChild(t)
-    const sub = new Text({
+    const sub = new Text({ resolution: 2,
       text: win ? 'победа · ' + reason : 'поражение · ' + reason,
       style: { fontFamily: 'Neucha, Georgia, serif', fontSize: 17, fill: '#bfb7a4' },
     })
@@ -719,6 +739,17 @@ export class BattleScene {
       hand: this.handView,
       hud: this.hud,
     }
+  }
+
+  /** Экранные координаты клетки/первой карты руки (для e2e настоящей мышью). */
+  debugScreenPos(sq: Sq): { x: number; y: number } {
+    const { x, y } = this.footXY(sq)
+    const off = this.stage?.boardLayer.position
+    return { x: x + (off?.x ?? 0), y: y + (off?.y ?? 0) }
+  }
+
+  debugFirstCard(): { iid: number; x: number; y: number } | null {
+    return this.handView.debugFirstCard()
   }
 
   destroy(): void {

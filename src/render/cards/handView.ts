@@ -4,6 +4,9 @@ import { cardDef, effectiveCost } from '../../engine'
 import { cubicOut, backOut } from '../anim/easings'
 import { killTweensOf, tween, wait } from '../anim/tween'
 import { CardView, CARD_H, CARD_W } from './cardView'
+
+/** Базовый масштаб карты в руке (hover поднимает выше). */
+const BASE_SCALE = 1.16
 import type { DragController, DragHost } from './dragController'
 
 /**
@@ -83,7 +86,7 @@ export class HandView {
   relayout(instant: boolean): void {
     const n = this.order.length
     const cx = this.area.x + this.area.w / 2
-    const cy = this.area.y + this.area.h - CARD_H * 0.62 // целиком в области, с запасом на дугу
+    const cy = this.area.y + this.area.h - CARD_H * 0.72 // целиком в области, с запасом на дугу
     const spread = Math.min(this.area.w - CARD_W * 0.7, Math.max(n - 1, 1) * 52)
     let z = 0
     for (let i = 0; i < n; i++) {
@@ -100,14 +103,14 @@ export class HandView {
         killTweensOf(view.root)
         view.root.position.set(view.homeX, view.homeY)
         view.root.rotation = view.homeRot
-        view.root.scale.set(1)
+        view.root.scale.set(BASE_SCALE)
         view.root.alpha = 1
       } else {
         killTweensOf(view.root)
         tween(view.root, { x: view.homeX, y: view.homeY, rotation: view.homeRot, alpha: 1 }, {
           dur: 0.28, ease: cubicOut,
         })
-        tween(view.root.scale, { x: 1, y: 1 }, { dur: 0.28, ease: cubicOut, owner: view.root })
+        tween(view.root.scale, { x: BASE_SCALE, y: BASE_SCALE }, { dur: 0.28, ease: cubicOut, owner: view.root })
       }
     }
   }
@@ -133,11 +136,11 @@ export class HandView {
     if (on) {
       view.root.zIndex = 1000
       tween(view.root, { x: view.homeX, y: view.homeY - 46, rotation: 0 }, { dur: 0.14, ease: cubicOut })
-      tween(view.root.scale, { x: 1.16, y: 1.16 }, { dur: 0.14, ease: backOut, owner: view.root })
+      tween(view.root.scale, { x: 1.38, y: 1.38 }, { dur: 0.14, ease: backOut, owner: view.root })
     } else {
       this.relayout(false)
       tween(view.root, { x: view.homeX, y: view.homeY, rotation: view.homeRot }, { dur: 0.18, ease: cubicOut })
-      tween(view.root.scale, { x: 1, y: 1 }, { dur: 0.18, ease: cubicOut, owner: view.root })
+      tween(view.root.scale, { x: BASE_SCALE, y: BASE_SCALE }, { dur: 0.18, ease: cubicOut, owner: view.root })
     }
   }
 
@@ -159,7 +162,7 @@ export class HandView {
       tween(view.root, { x: view.homeX, y: view.homeY, rotation: view.homeRot }, {
         dur: 0.3, ease: backOut,
       })
-      tween(view.root.scale, { x: 1, y: 1 }, { dur: 0.3, owner: view.root })
+      tween(view.root.scale, { x: BASE_SCALE, y: BASE_SCALE }, { dur: 0.3, owner: view.root })
       await wait(0.09)
     }
     await wait(0.3)
@@ -180,6 +183,16 @@ export class HandView {
 
   cardViews(): CardView[] {
     return [...this.views.values()]
+  }
+
+  /** Глобальная позиция первой карты руки (для e2e). */
+  debugFirstCard(): { iid: number; x: number; y: number } | null {
+    const iid = this.order[0]
+    if (iid === undefined) return null
+    const view = this.views.get(iid)
+    if (!view) return null
+    const g = view.root.getGlobalPosition()
+    return { iid, x: g.x, y: g.y }
   }
 
   destroy(): void {
