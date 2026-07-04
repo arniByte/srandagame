@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>CHECKMATISSE — шах и матисс</title>
+    <meta name="description" content="Рогалик-шахматы с картами в стиле Матисса и Малевича" />
+    <style>
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden; background: #14120f;
+        font-family: 'Georgia', 'Times New Roman', serif;
+        -webkit-user-select: none; user-select: none;
+        touch-action: none;
+      }
+      #app { position: fixed; inset: 0; }
+      #app > canvas, #app > div, #app > img {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+      }
+      #diorama { z-index: 0; pointer-events: none; }
+      #game { z-index: 1; }
+      #ui { z-index: 2; pointer-events: none; }
+      #ui * { pointer-events: auto; }
+      #boot {
+        position: absolute; inset: 0; z-index: 3;
+        display: flex; align-items: center; justify-content: center;
+        background: #f5efe0; color: #1d1d1b;
+        font-size: 20px; letter-spacing: 0.2em;
+        transition: opacity 0.5s; pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="diorama"></canvas>
+      <canvas id="game"></canvas>
+      <div id="ui"></div>
+      <div id="boot">CHECKMATISSE</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
