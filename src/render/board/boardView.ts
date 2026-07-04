@@ -7,7 +7,7 @@ import { ticker, TICK } from '../../core/ticker'
 import { tornPoly } from '../../assets/paperEdge'
 import { SM_HZ, visualRng } from '../anim/stopmotion'
 import { killTweensOf, tween, wait } from '../anim/tween'
-import { sqToXY, xyToSq, type Projection } from './projection'
+import { cellAt, scaleAt, sqToXY, xyToSq, type Projection } from './projection'
 
 /** Дизайн-размер тайла в текстуре (см. placeholders.tileTexture). */
 const TILE_DESIGN = 60
@@ -33,6 +33,7 @@ export class BoardView {
   private telegraphG = new Graphics()
 
   private pulseT = 0
+  private lastBreathStep = -1
   private offTick: () => void
 
   constructor() {
@@ -53,6 +54,18 @@ export class BoardView {
       const a = 0.55 + 0.35 * Math.sin(this.pulseT * 6)
       this.targetFrames.alpha = a
       this.firstMarkG.alpha = 0.7 + 0.3 * Math.sin(this.pulseT * 8)
+
+      // Дыхание бумаги: едва заметное степпед-покачивание тайлов (3 шага/с),
+      // у каждого своя фаза — коллаж «живёт», но не ёрзает.
+      const step = Math.floor(this.pulseT * 3)
+      if (step !== this.lastBreathStep) {
+        this.lastBreathStep = step
+        for (const [sq, sp] of this.tiles) {
+          const base = (visualRng(sq + 7)() * 2 - 1) * 0.02
+          const phase = (sq * 0.61) % 6.28
+          sp.rotation = base + Math.sin(step * 0.7 + phase) * 0.006
+        }
+      }
     }, TICK.TWEEN)
   }
 
@@ -71,7 +84,9 @@ export class BoardView {
       }
     }
     this.container.hitArea = new Rectangle(
-      proj.ox, proj.oy, proj.bw * proj.cell, proj.bh * proj.cellH,
+      proj.cx - (proj.bw * proj.cell) / 2, proj.rowTop[0] ?? 0,
+      proj.bw * proj.cell,
+      (proj.rowBottom[proj.bh - 1] ?? 0) - (proj.rowTop[0] ?? 0),
     )
   }
 
@@ -111,7 +126,8 @@ export class BoardView {
     sp.anchor.set(0.5)
     const { x, y } = sqToXY(p, sq)
     sp.position.set(x, y)
-    sp.scale.set(p.cell / TILE_DESIGN, (p.cellH / TILE_DESIGN))
+    const rs = scaleAt(p, sqY(sq))
+    sp.scale.set((p.cell * rs * 1.03) / TILE_DESIGN, (p.cellH * rs * 1.07) / TILE_DESIGN)
     // Едва заметный разнобой поворота — «наклеено руками».
     sp.rotation = (visualRng(sq + 7)() * 2 - 1) * 0.02
     this.tilesLayer.addChild(sp)
@@ -138,8 +154,9 @@ export class BoardView {
     if (sq === -1 || !this.proj) return
     const p = this.proj
     const { x, y } = sqToXY(p, sq)
+    const cw = cellAt(p, sqY(sq)), ch = p.cellH * scaleAt(p, sqY(sq))
     this.selectedG
-      .roundRect(x - p.cell / 2 + 2, y - p.cellH / 2 + 2, p.cell - 4, p.cellH - 4, 6)
+      .roundRect(x - cw / 2 + 2, y - ch / 2 + 2, cw - 4, ch - 4, 6)
       .stroke({ width: 3, color: PAL.ochre })
   }
 
@@ -153,7 +170,7 @@ export class BoardView {
       const { x, y } = sqToXY(this.proj, sq)
       dot.position.set(x, y)
       dot.alpha = 0.85
-      dot.scale.set(this.proj.cell / 90)
+      dot.scale.set(cellAt(this.proj, sqY(sq)) / 90)
       this.moveDots.addChild(dot)
     }
   }
@@ -166,7 +183,8 @@ export class BoardView {
     for (const sq of sqs) {
       const g = new Graphics()
       const { x, y } = sqToXY(p, sq)
-      g.roundRect(x - p.cell / 2 + 3, y - p.cellH / 2 + 3, p.cell - 6, p.cellH - 6, 5)
+      const cw = cellAt(p, sqY(sq)), ch = p.cellH * scaleAt(p, sqY(sq))
+      g.roundRect(x - cw / 2 + 3, y - ch / 2 + 3, cw - 6, ch - 6, 5)
         .stroke({ width: 2.5, color: PAL.blue })
       this.targetFrames.addChild(g)
     }
@@ -187,10 +205,14 @@ export class BoardView {
     this.telegraphG.clear()
     if (row < 0 || !this.proj) return
     const p = this.proj
+    const rw = p.bw * p.cell * scaleAt(p, row)
+    const rx = p.cx - rw / 2
+    const ry = p.rowTop[row] ?? 0
+    const rh = (p.rowBottom[row] ?? 0) - ry
     this.telegraphG
-      .rect(p.ox, p.oy + row * p.cellH, p.bw * p.cell, p.cellH)
+      .rect(rx, ry, rw, rh)
       .fill({ color: PAL.ochre, alpha: 0.14 })
-      .rect(p.ox, p.oy + row * p.cellH, p.bw * p.cell, p.cellH)
+      .rect(rx, ry, rw, rh)
       .stroke({ width: 2, color: PAL.ochre, alpha: 0.5 })
   }
 
@@ -215,7 +237,8 @@ export class BoardView {
       this.tiles.delete(at)
     }
     const { x, y } = sqToXY(p, at)
-    const hw = p.cell / 2, hh = p.cellH / 2
+    const rsC = scaleAt(p, sqY(at))
+    const hw = (p.cell * rsC) / 2, hh = (p.cellH * rsC) / 2
     const rng = visualRng(at + 31)
     const light = (sqX(at) + sqY(at)) % 2 === 0
     const color = light ? PAL.paper : 0xe6dcc3
@@ -280,7 +303,7 @@ export class BoardView {
       if (sqY(sq) !== row) continue
       const nx = sqX(sq) + dir
       const wraps = nx < 0 || nx >= p.bw
-      const target = sp.x + dir * p.cell
+      const target = sp.x + dir * p.cell * scaleAt(p, row)
       if (wraps) {
         movers.push(tween(sp, { x: target, alpha: 0 }, { dur: 4 / SM_HZ, quantizeHz: SM_HZ, owner: sp }).done)
       } else {

@@ -22,6 +22,56 @@ interface Layer {
   baseY: number
 }
 
+// Сгенерённый арт диорамы (public/assets/bg). Кэш переживает ресайзы.
+const texCache = new Map<string, THREE.Texture | null>()
+const loader = new THREE.TextureLoader()
+
+/** Пробует подменить canvas-текстуру слоя сгенерённой; тихо молчит, если нет файла. */
+function tryArt(url: string, apply: (tex: THREE.Texture) => void): void {
+  if (texCache.has(url)) {
+    const t = texCache.get(url)
+    if (t) apply(t)
+    return
+  }
+  loader.load(
+    url,
+    tex => {
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.minFilter = THREE.LinearFilter
+      texCache.set(url, tex)
+      apply(tex)
+    },
+    undefined,
+    () => texCache.set(url, null),
+  )
+}
+
+interface SwapOpts {
+  /** Сохранить аспект картинки при заданной ширине. */
+  keepAspectW?: number
+  /** Прижать нижний край плоскости к этому экранному Y. */
+  anchorBottomY?: number
+  /** Приглушение яркости (0..1), чтобы фон не спорил с доской. */
+  mute?: number
+}
+
+function swapMap(mesh: THREE.Mesh, tex: THREE.Texture, opts: SwapOpts = {}): void {
+  const m = mesh.material as THREE.MeshBasicMaterial
+  m.map = tex
+  m.needsUpdate = true
+  if (opts.mute !== undefined) m.color.setScalar(opts.mute)
+  const geo = mesh.geometry as THREE.PlaneGeometry
+  const gw = geo.parameters.width, gh = geo.parameters.height
+  if (opts.keepAspectW && tex.image) {
+    const img = tex.image as { width: number; height: number }
+    const wantH = opts.keepAspectW * (img.height / img.width)
+    mesh.scale.set(opts.keepAspectW / gw, wantH / gh, 1)
+  }
+  if (opts.anchorBottomY !== undefined) {
+    mesh.position.y = opts.anchorBottomY + (gh * mesh.scale.y) / 2
+  }
+}
+
 export interface DioramaHandle {
   dispose(): void
 }
@@ -70,6 +120,12 @@ export class DioramaScene implements DioramaHandle {
   }
 
   private dimLayer: THREE.Mesh
+  private dove: THREE.Mesh | null = null
+  private doveT = 0
+  private doveNext = 7
+  private doveDir = 1
+  private viewW = 1280
+  private viewH = 720
 
   private canvasTexture(cv: HTMLCanvasElement): THREE.CanvasTexture {
     const tex = new THREE.CanvasTexture(cv)
@@ -105,14 +161,34 @@ export class DioramaScene implements DioramaHandle {
     this.layers.length = 0
 
     // Координаты: центр экрана (0,0), x вправо, y вверх.
-    this.addLayer(paintSky(w, h), w + 24, h + 24, 0, 0, -900, 0, 0)
+    const sky = this.addLayer(paintSky(w, h), w + 24, h + 24, 0, 0, -900, 0, 0)
     const sun = Math.min(w, h) * 0.34
-    this.addLayer(paintSun(sun), sun, sun, -w * 0.31, h * 0.24, -850, 1.5, 1)
-    this.addLayer(paintHills(w * 1.15, h * 0.5, 0x2a2013, 41, 0.35), w * 1.15, h * 0.5, 0, -h * 0.17, -800, 2.5, 2)
+    const sunMesh = this.addLayer(paintSun(sun), sun, sun, -w * 0.31, h * 0.24, -850, 1.5, 1)
+    // Солнце уже нарисовано в сгенерённом небе — кодовое прячем.
+    tryArt('/assets/bg/sky.webp', t => { swapMap(sky, t, { mute: 0.82 }); sunMesh.visible = false })
+    const hillsFar = this.addLayer(paintHills(w * 1.18, h * 0.36, 0x2a2013, 41, 0.35), w * 1.18, h * 0.36, 0, -h * 0.27, -800, 2.5, 2)
+    tryArt('/assets/bg/hills-far.webp', t => swapMap(hillsFar, t, { mute: 0.68 }))
     const cw = Math.min(w * 0.42, h * 0.62)
-    this.castle = this.addLayer(paintCastle(cw, cw * 0.8), cw, cw * 0.8, w * 0.26, -h * 0.06, -750, 3.2, 3)
-    this.addLayer(paintHills(w * 1.2, h * 0.45, 0x191510, 88, 0.3), w * 1.2, h * 0.45, 0, -h * 0.31, -700, 4.5, 4)
+    const castleMesh = this.addLayer(paintCastle(cw, cw * 0.8), cw, cw * 0.8, w * 0.26, -h * 0.06, -750, 3.2, 3)
+    this.castle = castleMesh
+    tryArt('/assets/bg/castle.webp', t =>
+      swapMap(castleMesh, t, { keepAspectW: cw, anchorBottomY: -h * 0.30, mute: 0.9 }))
+    const hillsNear = this.addLayer(paintHills(w * 1.3, h * 0.32, 0x191510, 88, 0.3), w * 1.3, h * 0.32, 0, -h * 0.38, -700, 4.5, 4)
+    tryArt('/assets/bg/hills-near.webp', t => swapMap(hillsNear, t, { mute: 0.55 }))
     this.addLayer(paintFrontEdge(w * 1.15, h * 0.24), w * 1.15, h * 0.24, 0, -h * 0.45, -650, 6, 5)
+
+    // Постоянное лёгкое затемнение фона: доска и фигуры должны солировать.
+    const baseDimMat = new THREE.MeshBasicMaterial({
+      color: 0x14120f, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false,
+    })
+    const baseDim = new THREE.Mesh(new THREE.PlaneGeometry(w * 1.5, h * 1.5), baseDimMat)
+    baseDim.renderOrder = 49
+    baseDim.position.z = 400
+    this.scene.add(baseDim)
+    this.layers.push({ mesh: baseDim, depth: 0, baseX: 0, baseY: 0 })
+
+    // Голубь-путешественник: изредка пересекает небо.
+    this.setupDove(w, h)
 
     this.dimLayer.scale.set(w * 1.4, h * 1.4, 1)
     this.fx.dispose()
@@ -130,7 +206,56 @@ export class DioramaScene implements DioramaHandle {
     this.rebuildLayers(w, h)
   }
 
+  private setupDove(w: number, h: number): void {
+    this.viewW = w
+    this.viewH = h
+    if (this.dove) return
+    tryArt('/assets/pieces/vermilion_dove.webp', tex => {
+      const size = 46
+      const img = tex.image as { width: number; height: number }
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex, transparent: true, depthTest: false, depthWrite: false, opacity: 0.92,
+      })
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(size, size * (img.height / img.width)), mat)
+      mesh.renderOrder = 2
+      mesh.position.set(-w, h * 0.3, -840)
+      mesh.visible = false
+      this.scene.add(mesh)
+      this.dove = mesh
+    })
+  }
+
+  /** Полёт голубя: степпед-взмахи (стоп-моушен), редкие пролёты. */
+  private updateDove(dt: number): void {
+    const dove = this.dove
+    if (!dove) return
+    this.doveT += dt
+    if (!dove.visible) {
+      if (this.doveT >= this.doveNext) {
+        // Новый пролёт.
+        this.doveDir = Math.random() < 0.5 ? 1 : -1
+        dove.position.x = -this.doveDir * (this.viewW / 2 + 60)
+        dove.position.y = this.viewH * (0.16 + Math.random() * 0.2)
+        dove.scale.x = this.doveDir >= 0 ? 1 : -1
+        dove.visible = true
+      }
+      return
+    }
+    dove.position.x += this.doveDir * dt * this.viewW * 0.055
+    // Взмахи 6 шагов/с: жёсткое переключение «крылья вверх/вниз».
+    const flap = Math.floor(this.doveT * 6) % 2
+    dove.scale.y = flap === 0 ? 1 : 0.82
+    dove.position.y += Math.sin(this.doveT * 1.7) * dt * 6
+    if (Math.abs(dove.position.x) > this.viewW / 2 + 80) {
+      dove.visible = false
+      this.doveT = 0
+      this.doveNext = 12 + Math.random() * 16
+    }
+  }
+
   private update(dt: number): void {
+    this.updateDove(dt)
     // Параллакс: плавное следование за мышью.
     const k = Math.min(dt * 6, 1)
     this.smooth.x += (this.mouse.x - this.smooth.x) * k

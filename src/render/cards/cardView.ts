@@ -37,6 +37,9 @@ export class CardView {
 
     const frame = new Sprite(assets.texture(`card.frame.${def.rarity}`))
     frame.anchor.set(0.5)
+    // Рамка растягивается в дизайн-бокс карты (сгенерённый арт любого размера).
+    frame.width = CARD_W
+    frame.height = CARD_H
     this.root.addChild(frame)
 
     const illus = new Sprite(assets.texture(`card.illus.${def.id}`))
@@ -52,8 +55,8 @@ export class CardView {
     const name = new Text({
       text: def.name,
       style: {
-        fontFamily: 'Georgia, "Times New Roman", serif',
-        fontSize: 14,
+        fontFamily: '"Amatic SC", Georgia, serif',
+        fontSize: 19,
         fontWeight: 'bold',
         fill: cssColor(PAL.ink),
         align: 'center',
@@ -67,7 +70,7 @@ export class CardView {
     const desc = new Text({
       text: def.desc,
       style: {
-        fontFamily: 'Georgia, serif',
+        fontFamily: 'Neucha, Georgia, serif',
         fontSize: 10,
         fill: '#4a453b',
         align: 'center',
@@ -89,9 +92,9 @@ export class CardView {
     this.costText = new Text({
       text: String(cost),
       style: {
-        fontFamily: 'Georgia, serif',
-        fontSize: 15,
-        fontWeight: 'bold',
+        fontFamily: 'Caveat, Georgia, serif',
+        fontSize: 17,
+        fontWeight: '700',
         fill: cssColor(PAL.paper),
       },
     })

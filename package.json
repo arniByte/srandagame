@@ -13,6 +13,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/amatic-sc": "^5.2.7",
+    "@fontsource/caveat": "^5.2.8",
+    "@fontsource/neucha": "^5.2.8",
     "@supabase/supabase-js": "^2.58.0",
     "pixi.js": "^8.13.0",
     "preact": "^10.27.0",

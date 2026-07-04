@@ -28,7 +28,7 @@ for (const item of spec) {
   const buf = execFileSync('curl', ['-sS', '--fail', url], { maxBuffer: 64 * 1024 * 1024 })
   const b64 = buf.toString('base64')
 
-  const result = await page.evaluate(async ({ b64, kind }) => {
+  const result = await page.evaluate(async ({ b64, kind, crop }) => {
     const resp = await fetch('data:image/png;base64,' + b64)
     const blob = await resp.blob()
     const bmp = await createImageBitmap(blob)
@@ -39,6 +39,10 @@ for (const item of spec) {
     ctx.drawImage(bmp, 0, 0)
 
     let sx = 0, sy = 0, sw = W, sh = H
+    if (crop) {
+      sx = Math.round(W * crop[0]); sy = Math.round(H * crop[1])
+      sw = Math.round(W * (crop[2] - crop[0])); sh = Math.round(H * (crop[3] - crop[1]))
+    }
 
     if (kind === 'piece') {
       // Скан альфы: рамка объекта.
@@ -62,11 +66,17 @@ for (const item of spec) {
       sh = Math.min(H - sy, maxY + pad - sy + 1)
     }
 
-    // Целевой размер: фигуры — высота 512; карты — ширина 320.
+    // Целевой размер: piece — h512; card/frame — w320; wide — w1600; strip — w1400 (с кропом).
     let tw, th
     if (kind === 'piece') {
       th = 512
       tw = Math.round(sw * (th / sh))
+    } else if (kind === 'wide') {
+      tw = 1600
+      th = Math.round(sh * (tw / sw))
+    } else if (kind === 'strip') {
+      tw = 1400
+      th = Math.round(sh * (tw / sw))
     } else {
       tw = 320
       th = Math.round(sh * (tw / sw))
@@ -84,7 +94,7 @@ for (const item of spec) {
       fr.readAsDataURL(outBlob)
     })
     return { outB64, tw, th }
-  }, { b64, kind })
+  }, { b64, kind, crop: item.crop ?? null })
 
   mkdirSync(dirname(out), { recursive: true })
   writeFileSync(out, Buffer.from(result.outB64, 'base64'))

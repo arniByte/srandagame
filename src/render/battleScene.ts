@@ -4,13 +4,14 @@ import { sqY } from '../engine/types'
 import { cardDef, pieceType, traitDef } from '../engine'
 import { bus } from '../core/bus'
 import { viewport } from '../core/resize'
+import { ticker, TICK } from '../core/ticker'
 import { assets } from '../assets/manifest'
 import { PIECE_TEX } from '../assets/placeholders'
 import { FACTION, PAL, cssColor, factionOf } from '../assets/palette'
 import { audio } from '../audio/audioManager'
 import { tween, wait } from './anim/tween'
 import { SM_HZ } from './anim/stopmotion'
-import { computeProjection, sqToXY, xyToSq, type Projection } from './board/projection'
+import { cellAt, computeProjection, scaleAt, sqToXY, xyToSq, type Projection } from './board/projection'
 import { BoardView } from './board/boardView'
 import { PieceView } from './board/pieceView'
 import { splatter } from './fx/splatter'
@@ -60,6 +61,10 @@ export class BattleScene {
   private lastW = viewport.w
   private lastH = viewport.h
   private disposers: (() => void)[] = []
+  private mouseNX = 0
+  private mouseNY = 0
+  private parX = 0
+  private parY = 0
 
   constructor(host: BattleSceneHost) {
     this.host = host
@@ -89,6 +94,32 @@ export class BattleScene {
     this.disposers.push(bus.on('resize', ({ w, h }) => this.layout(w, h)))
     this.disposers.push(bus.on('assetsSwapped', () => this.syncImmediate()))
 
+    // Параллакс стола за мышью + медленное «дыхание» сцены: доска, фигуры
+    // и FX плывут как единый слой между диорамой и рукой карт.
+    const onMove = (e: PointerEvent): void => {
+      this.mouseNX = e.clientX / Math.max(1, window.innerWidth) - 0.5
+      this.mouseNY = e.clientY / Math.max(1, window.innerHeight) - 0.5
+    }
+    window.addEventListener('pointermove', onMove)
+    this.disposers.push(() => window.removeEventListener('pointermove', onMove))
+    let breatheT = 0
+    this.disposers.push(ticker.add((dt) => {
+      breatheT += dt
+      // Демпфированное следование за мышью.
+      this.parX += ((this.mouseNX * -14) - this.parX) * Math.min(1, dt * 3)
+      this.parY += ((this.mouseNY * -9) - this.parY) * Math.min(1, dt * 3)
+      const bobY = Math.sin(breatheT * 0.45) * 2.2
+      const bobX = Math.sin(breatheT * 0.31 + 1.7) * 1.4
+      const st = this.stage
+      if (st) {
+        st.boardLayer.position.set(this.parX + bobX, this.parY + bobY)
+        st.piecesLayer.position.set(this.parX + bobX, this.parY + bobY)
+        st.fxLayer.position.set(this.parX + bobX, this.parY + bobY)
+        // Рука — ближе к камере: движется чуть сильнее и в ту же сторону.
+        st.handLayer.position.set(this.parX * 1.6, this.parY * 1.3)
+      }
+    }, TICK.TWEEN))
+
     this.layout(viewport.w, viewport.h)
     this.syncImmediate()
   }
@@ -105,7 +136,7 @@ export class BattleScene {
       const p = this.statePiece(view.id)
       if (p) {
         const { x, y } = this.footXY(p.pos)
-        view.setPos(x, y, this.proj.cell)
+        view.setPos(x, y, cellAt(this.proj, sqY(p.pos)))
       }
     }
     this.handView.setArea({ x: w - handW + 6, y: h - 336, w: handW - 16, h: 300 })
@@ -147,11 +178,11 @@ export class BattleScene {
   private footXY(sq: Sq): { x: number; y: number } {
     const p = this.proj as Projection
     const { x, y } = sqToXY(p, sq)
-    return { x, y: y + p.cellH * 0.2 }
+    return { x, y: y + p.cellH * scaleAt(p, sqY(sq)) * 0.2 }
   }
 
   private addPieceView(p: Piece): PieceView {
-    const view = new PieceView(p, this.proj?.cell ?? 64)
+    const view = new PieceView(p, this.proj ? cellAt(this.proj, sqY(p.pos)) : 64)
     const { x, y } = this.footXY(p.pos)
     view.setPos(x, y)
     this.stage?.piecesLayer.addChild(view.root)
@@ -423,7 +454,10 @@ export class BattleScene {
       let view = this.pieceViews.get(p.id)
       if (!view) view = this.addPieceView(p)
       const { x, y } = this.footXY(p.pos)
-      if (Math.abs(view.x - x) > 0.5 || Math.abs(view.y - y) > 0.5) view.setPos(x, y)
+      const cw = this.proj ? cellAt(this.proj, sqY(p.pos)) : undefined
+      if (Math.abs(view.x - x) > 0.5 || Math.abs(view.y - y) > 0.5 || cw !== undefined) {
+        view.setPos(x, y, cw)
+      }
       this.applyPieceOverlays(view, p)
     }
     for (const [id, view] of [...this.pieceViews]) {
@@ -445,7 +479,7 @@ export class BattleScene {
     this.turnText = new Text({
       text: '',
       style: {
-        fontFamily: 'Georgia, serif', fontSize: 17, fontWeight: 'bold',
+        fontFamily: '"Amatic SC", Georgia, serif', fontSize: 24, fontWeight: '700',
         fill: cssColor(PAL.paper),
       },
     })
@@ -453,7 +487,7 @@ export class BattleScene {
 
     this.objText = new Text({
       text: '',
-      style: { fontFamily: 'Georgia, serif', fontSize: 13, fill: '#bfb7a4' },
+      style: { fontFamily: 'Neucha, Georgia, serif', fontSize: 15, fill: '#bfb7a4' },
     })
     this.objText.position.set(16, HUD_TOP + 24)
 
@@ -463,7 +497,7 @@ export class BattleScene {
     const btnText = new Text({
       text: 'Конец хода',
       style: {
-        fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 'bold',
+        fontFamily: '"Amatic SC", Georgia, serif', fontSize: 23, fontWeight: '700',
         fill: cssColor(PAL.paper),
       },
     })
@@ -511,7 +545,7 @@ export class BattleScene {
     }
     const label = new Text({
       text: `${side.paint}/${side.paintMax}`,
-      style: { fontFamily: 'Georgia, serif', fontSize: 13, fill: '#bfb7a4' },
+      style: { fontFamily: 'Neucha, Georgia, serif', fontSize: 15, fill: '#bfb7a4' },
     })
     label.anchor.set(0, 0.5)
     label.position.set(side.paintMax * 22 + 8, 0)
@@ -536,7 +570,7 @@ export class BattleScene {
     const t = new Text({
       text: `Противник: «${name}»`,
       style: {
-        fontFamily: 'Georgia, serif', fontSize: 15, fontWeight: 'bold',
+        fontFamily: '"Amatic SC", Georgia, serif', fontSize: 22, fontWeight: '700',
         fill: cssColor(PAL.ink),
       },
     })
@@ -587,7 +621,7 @@ export class BattleScene {
     const title = new Text({
       text: 'Мазок дошёл до края — выберите мутацию',
       style: {
-        fontFamily: 'Georgia, serif', fontSize: 22, fontWeight: 'bold',
+        fontFamily: '"Amatic SC", Georgia, serif', fontSize: 30, fontWeight: '700',
         fill: cssColor(PAL.paper),
       },
     })
@@ -615,7 +649,7 @@ export class BattleScene {
       const name = new Text({
         text: label,
         style: {
-          fontFamily: 'Georgia, serif', fontSize: 16, fontWeight: 'bold',
+          fontFamily: '"Amatic SC", Georgia, serif', fontSize: 23, fontWeight: '700',
           fill: cssColor(PAL.ink), align: 'center',
           wordWrap: true, wordWrapWidth: cardW - 18,
         },
@@ -651,7 +685,7 @@ export class BattleScene {
     const t = new Text({
       text: win ? 'КАРТИНА ЗАВЕРШЕНА' : 'КОЛЛАЖ РАЗОРВАН',
       style: {
-        fontFamily: 'Georgia, serif', fontSize: 42, fontWeight: 'bold',
+        fontFamily: '"Amatic SC", Georgia, serif', fontSize: 58, fontWeight: '700',
         fill: win ? cssColor(PAL.ochre) : cssColor(PAL.vermilion),
         letterSpacing: 4,
       },
@@ -660,7 +694,7 @@ export class BattleScene {
     banner.addChild(t)
     const sub = new Text({
       text: win ? 'победа · ' + reason : 'поражение · ' + reason,
-      style: { fontFamily: 'Georgia, serif', fontSize: 15, fill: '#bfb7a4' },
+      style: { fontFamily: 'Neucha, Georgia, serif', fontSize: 17, fill: '#bfb7a4' },
     })
     sub.anchor.set(0.5)
     sub.position.set(0, 38)
@@ -690,6 +724,13 @@ export class BattleScene {
   destroy(): void {
     for (const d of this.disposers) d()
     this.disposers.length = 0
+    // Возврат слоёв из параллакса в ноль.
+    if (this.stage) {
+      this.stage.boardLayer.position.set(0, 0)
+      this.stage.piecesLayer.position.set(0, 0)
+      this.stage.fxLayer.position.set(0, 0)
+      this.stage.handLayer.position.set(0, 0)
+    }
     this.drag?.destroy()
     this.promoteOverlay?.destroy({ children: true })
     this.banner?.destroy({ children: true })

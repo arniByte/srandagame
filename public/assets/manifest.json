@@ -196,5 +196,17 @@
  },
  "card.illus.gust": {
   "src": "/assets/cards/gust.webp"
+ },
+ "ui.paper": {
+  "src": "/assets/ui/paper.webp"
+ },
+ "card.frame.common": {
+  "src": "/assets/ui/frame-common.webp"
+ },
+ "card.frame.uncommon": {
+  "src": "/assets/ui/frame-uncommon.webp"
+ },
+ "card.frame.rare": {
+  "src": "/assets/ui/frame-rare.webp"
  }
 }
