@@ -44,6 +44,8 @@ test('реальный клик двигает фигуру, drag разыгры
   // 2) Drag первой карты руки на её легальную цель (или центр доски).
   await page.evaluate(() => window.__cm.tryAction({ t: 'endTurn' }))
   await page.waitForFunction(() => window.__cm.inputEnabled(), undefined, { timeout: 30000 })
+  // Краска после нерфа копится медленно — для теста драга наливаем сразу.
+  await page.evaluate(() => { window.__cm.battle!.sides[0]!.paint = 8 })
   const before = await page.evaluate(() =>
     JSON.stringify({ hand: window.__cm.getState().sides[0]!.hand.length, paint: window.__cm.getState().sides[0]!.paint }))
   const card = await page.evaluate(() => window.__cm.debugFirstCard())

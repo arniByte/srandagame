@@ -44,7 +44,7 @@ for (const item of spec) {
       sw = Math.round(W * (crop[2] - crop[0])); sh = Math.round(H * (crop[3] - crop[1]))
     }
 
-    if (kind === 'piece') {
+    if (kind === 'piece' || kind === 'strip') {
       // Скан альфы: рамка объекта.
       const data = ctx.getImageData(0, 0, W, H).data
       let minX = W, minY = H, maxX = 0, maxY = 0
@@ -76,6 +76,9 @@ for (const item of spec) {
       th = Math.round(sh * (tw / sw))
     } else if (kind === 'strip') {
       tw = 1400
+      th = Math.round(sh * (tw / sw))
+    } else if (kind === 'event') {
+      tw = 640
       th = Math.round(sh * (tw / sw))
     } else {
       tw = 320

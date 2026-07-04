@@ -40,7 +40,7 @@ export class GameController implements BattleSceneHost {
   hasSave = false
 
   // --- Кооп.
-  mode: 'solo' | 'coop-host' | 'coop-guest' = 'solo'
+  mode: 'solo' | 'coop-host' | 'coop-guest' | 'hotseat' = 'solo'
   roomCode: string | null = null
   lobbyStatus = ''
   guestPresent = false
@@ -81,10 +81,20 @@ export class GameController implements BattleSceneHost {
     this.screen = s
     bus.emit('screen', { name: s })
     this.updateMusic(s)
+    this.updateBiome(s)
     this.notify()
     // Хост зеркалит мета-экраны гостю (бой синхронизируется отдельно).
     if (this.mode === 'coop-host' && s !== 'battle') {
       void this.netHost?.syncMeta()
+    }
+  }
+
+  private updateBiome(s: ScreenName): void {
+    if (s === 'battle') {
+      const enc = this.run?.inBattle ? encounterDef(this.run.inBattle.encounterId) : null
+      bus.emit('biome', { name: enc?.boss ? 'blood' : enc?.elite ? 'night' : 'dusk' })
+    } else {
+      bus.emit('biome', { name: 'dusk' })
     }
   }
 
@@ -225,6 +235,13 @@ export class GameController implements BattleSceneHost {
     this.newRun()
   }
 
+  /** Хотсит: двое за одним устройством, ходы по очереди (как в сетевом коопе). */
+  startHotseat(): void {
+    this.leaveCoop()
+    this.mode = 'hotseat'
+    this.newRun()
+  }
+
   private hostDelegate(): HostDelegate {
     return {
       getBattle: () => this.battle,
@@ -305,9 +322,14 @@ export class GameController implements BattleSceneHost {
   }
 
   private isMyTurn(): boolean {
-    if (this.mode === 'solo') return true
+    if (this.mode === 'solo' || this.mode === 'hotseat') return true
     const guestTurn = this.isGuestTurn()
     return this.mode === 'coop-guest' ? guestTurn : !guestTurn
+  }
+
+  /** Чей ход в хотсите: 1 или 2 (по чётности командного хода). */
+  hotseatPlayer(): 1 | 2 {
+    return this.battle && this.battle.turn % 2 === 0 ? 2 : 1
   }
 
   availableNodes(): MapNode[] {
