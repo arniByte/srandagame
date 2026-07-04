@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- Ручной смоук визуального слоя: `npx vite`, открыть /src/render/demo.html.
+     Не участвует в прод-сборке (vite build собирает только корневой index.html). -->
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CHECKMATISSE — demo боя</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #14120f; overflow: hidden; }
+    #demo-root { position: relative; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="demo-root"></div>
+  <script type="module">
+    import { mountBattleDemo } from './demo'
+    mountBattleDemo({ root: document.getElementById('demo-root') })
+  </script>
+</body>
+</html>
