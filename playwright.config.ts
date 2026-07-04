@@ -7,6 +7,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     viewport: { width: 1280, height: 720 },
+    // Предустановленный Chromium окружения (версия может отличаться от пина Playwright).
+    launchOptions: { executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium' },
   },
   webServer: {
     command: 'npm run build && npm run preview',

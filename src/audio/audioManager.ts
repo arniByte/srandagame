@@ -1,5 +1,6 @@
 import { settings } from '../core/settings'
 import { renderSfx, type SfxKey } from './synthSfx'
+import { GenerativeMusic, MOODS } from './generativeMusic'
 
 export type { SfxKey }
 
@@ -16,6 +17,8 @@ class AudioManager {
   private buffers = new Map<SfxKey, AudioBuffer>()
   private pending: SfxKey[] = []
   private initDone = false
+  private gen: GenerativeMusic | null = null
+  private pendingMood: string | null = null
 
   /** Навешивает разблокировку на первый жест. Вызывать один раз на буте. */
   init(): void {
@@ -44,6 +47,8 @@ class AudioManager {
     this.sfxBus.connect(this.master)
     this.applyVolumes()
     if (ctx.state === 'suspended') void ctx.resume()
+    this.gen = new GenerativeMusic(ctx, this.musicBus as GainNode)
+    if (this.pendingMood) this.music(this.pendingMood)
     // Проигрываем то, что запросили до разблокировки (максимум один — без каши).
     const first = this.pending[0]
     this.pending.length = 0
@@ -80,9 +85,17 @@ class AudioManager {
     src.start()
   }
 
-  /** Музыки в M1 нет — API-заглушка под будущие треки. */
-  music(_key: string | null): void {
-    /* заглушка: сюда встанет кроссфейд лупов */
+  /**
+   * Генеративная музыка: ключ настроения из MOODS (menu/map/battle/boss)
+   * или null — тишина. До разблокировки запоминаем желаемое настроение.
+   */
+  music(key: string | null): void {
+    if (!this.gen) {
+      this.pendingMood = key
+      return
+    }
+    this.pendingMood = key
+    this.gen.setMood(key ? MOODS[key] ?? null : null)
   }
 
   get unlocked(): boolean {

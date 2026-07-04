@@ -52,9 +52,9 @@ export function paintSky(w: number, h: number): HTMLCanvasElement {
   const { cv, ctx } = mkCanvas(w, h)
   const grad = ctx.createLinearGradient(0, 0, 0, h)
   grad.addColorStop(0, cssColor(PAL.bg))
-  grad.addColorStop(0.55, '#241d15')
-  grad.addColorStop(0.82, '#4a2e1a')
-  grad.addColorStop(1, '#6b3b1e')
+  grad.addColorStop(0.5, '#2b2118')
+  grad.addColorStop(0.8, '#5a3a20')
+  grad.addColorStop(1, '#8a4d24')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, w, h)
   return cv

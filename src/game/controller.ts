@@ -61,6 +61,7 @@ export class GameController implements BattleSceneHost {
     loadContent()
     this.stage = stage
     this.hasSave = loadRun() !== null
+    this.updateMusic('menu')
   }
 
   // -------------------------------------------------------------------------
@@ -79,10 +80,32 @@ export class GameController implements BattleSceneHost {
   private setScreen(s: ScreenName): void {
     this.screen = s
     bus.emit('screen', { name: s })
+    this.updateMusic(s)
     this.notify()
     // Хост зеркалит мета-экраны гостю (бой синхронизируется отдельно).
     if (this.mode === 'coop-host' && s !== 'battle') {
       void this.netHost?.syncMeta()
+    }
+  }
+
+  private updateMusic(s: ScreenName): void {
+    switch (s) {
+      case 'menu':
+      case 'lobby':
+        audio.music('menu')
+        break
+      case 'battle': {
+        const enc = this.run?.inBattle ? encounterDef(this.run.inBattle.encounterId) : null
+        audio.music(enc?.boss ? 'boss' : 'battle')
+        break
+      }
+      case 'gameover':
+      case 'victory':
+        audio.music(null)
+        break
+      default:
+        audio.music('map')
+        break
     }
   }
 
